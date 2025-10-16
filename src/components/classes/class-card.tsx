@@ -1,11 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import NextLink from 'next/link';
+import { memo } from 'react';
 import {
   Avatar,
   Box,
-  Button,
   Card,
   CardContent,
   CardHeader,
@@ -41,7 +39,7 @@ const statusMap = {
   'completed': { color: 'info', text: 'Đã hoàn thành' }
 };
 
-export function ClassCard({ classItem }: ClassCardProps) {
+export const ClassCard = memo(function ClassCard({ classItem }: ClassCardProps) {
   // Lấy thông tin môn học và giáo viên
   const subject = subjects.find(s => s.id === classItem.subjectId);
   const teacher = classItem.teacherId 
@@ -190,4 +188,4 @@ export function ClassCard({ classItem }: ClassCardProps) {
       </Box>
     </Card>
   );
-}
+});

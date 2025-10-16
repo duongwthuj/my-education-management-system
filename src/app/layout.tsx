@@ -1,15 +1,29 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import '@fontsource/inter/300.css';
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/plus-jakarta-sans/600.css';
-import '@fontsource/plus-jakarta-sans/700.css';
-import '@fontsource/roboto-mono/300.css';
+import { Inter, Plus_Jakarta_Sans, Roboto_Mono } from 'next/font/google';
 
 import { ThemeRegistry } from '../components/theme-registry';
+
+const inter = Inter({
+  subsets: ['latin', 'vietnamese'],
+  weight: ['300', '400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-inter',
+});
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin', 'vietnamese'],
+  weight: ['600', '700'],
+  display: 'swap',
+  variable: '--font-plus-jakarta',
+});
+
+const robotoMono = Roboto_Mono({
+  subsets: ['latin'],
+  weight: ['300'],
+  display: 'swap',
+  variable: '--font-roboto-mono',
+});
 
 export const metadata: Metadata = {
   title: 'Hệ thống quản lý giáo viên',
@@ -22,8 +36,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi">
-      <body>
+    <html lang="vi" className={`${inter.variable} ${plusJakartaSans.variable} ${robotoMono.variable}`}>
+      <body className={inter.className}>
         <ThemeRegistry>
           <Suspense fallback={<div>Loading...</div>}>
             {children}

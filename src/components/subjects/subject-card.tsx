@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import NextLink from 'next/link';
+import { useState, memo } from 'react';
 import {
   Avatar,
   Box,
@@ -9,7 +8,6 @@ import {
   Card,
   CardContent,
   CardActions,
-  CardHeader,
   Chip,
   Divider,
   IconButton,
@@ -19,17 +17,14 @@ import {
   Tooltip
 } from '@mui/material';
 import {
-  User,
   Eye,
   PencilSimple,
   Trash,
   BookBookmark,
   UsersThree,
-  ClockAfternoon,
-  CreditCard
+  ClockAfternoon
 } from '@phosphor-icons/react';
 import { Subject } from '@/types';
-import { teachers } from '@/data';
 
 interface SubjectCardProps {
   subject: Subject;
@@ -41,7 +36,7 @@ const levelMap = {
   'advanced': { color: 'error', text: 'Nâng cao', progress: 100 }
 };
 
-export function SubjectCard({ subject }: SubjectCardProps) {
+export const SubjectCard = memo(function SubjectCard({ subject }: SubjectCardProps) {
   const teachersCount = subject.teachers.length;
   const [elevated, setElevated] = useState(false);
   
@@ -179,4 +174,4 @@ export function SubjectCard({ subject }: SubjectCardProps) {
       </CardActions>
     </Card>
   );
-}
+});

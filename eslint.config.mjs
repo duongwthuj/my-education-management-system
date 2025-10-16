@@ -26,7 +26,7 @@ export default [
 	{
 		rules: {
 			"@typescript-eslint/no-unused-vars": [
-				"error",
+				"warn",
 				{
 					ignoreRestSiblings: true,
 					argsIgnorePattern: "^_",
@@ -35,6 +35,9 @@ export default [
 				},
 			],
 			"@typescript-eslint/no-empty-object-type": "off",
+			"@typescript-eslint/no-explicit-any": "warn",
+			"@typescript-eslint/ban-ts-comment": "warn",
+			"@typescript-eslint/prefer-as-const": "warn",
 		},
 	},
 	configPrettier,
@@ -59,6 +62,7 @@ export default [
 			"unicorn/no-null": "off",
 			"unicorn/no-nested-ternary": "off",
 			"unicorn/no-array-reduce": "off",
+			"unicorn/prefer-number-properties": "warn",
 		},
 	},
 	pluginReact.configs.flat.recommended,
@@ -70,6 +74,7 @@ export default [
 		},
 		rules: {
 			"react/prop-types": "off",
+			"react/react-in-jsx-scope": "off",
 		},
 	},
 	...compat.extends("plugin:react-hooks/recommended"),

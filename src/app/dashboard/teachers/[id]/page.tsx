@@ -7,11 +7,12 @@ export const metadata: Metadata = {
 };
 
 interface TeacherDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export default function TeacherDetailPage({ params }: TeacherDetailPageProps) {
-  return <TeacherDetail teacherId={params.id} />;
+export default async function TeacherDetailPage({ params }: TeacherDetailPageProps) {
+  const { id } = await params;
+  return <TeacherDetail teacherId={id} />;
 }
