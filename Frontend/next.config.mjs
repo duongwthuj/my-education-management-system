@@ -22,6 +22,19 @@ const config = {
   compiler: {
     emotion: true,
   },
+
+  // API proxy configuration (optional - for development)
+  // Uncomment if you want to proxy API requests through Next.js
+  /*
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:5000/api/:path*',
+      },
+    ];
+  },
+  */
 };
 
 export default config;

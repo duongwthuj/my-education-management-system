@@ -37,9 +37,7 @@ export function ClassesList() {
     // Lọc theo từ khóa tìm kiếm
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      return cls.name.toLowerCase().includes(query) || 
-        cls.description.toLowerCase().includes(query) ||
-        cls.location.toLowerCase().includes(query);
+      return cls.name.toLowerCase().includes(query)
     }
     
     return true;
@@ -159,7 +157,7 @@ export function ClassesList() {
                     sm={12}
                     xs={12}
                   >
-                    <ClassCard classItem={classItem} />
+
                   </Grid>
                 ))}
               </Grid>
