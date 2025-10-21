@@ -20,7 +20,6 @@ import {
 } from '@mui/material';
 import { Eye, PencilSimple, Trash } from '@phosphor-icons/react';
 import { Schedule } from '@/types';
-import { teachers, subjects } from '@/data';
 
 const statusMap = {
   'scheduled': { color: 'info', text: 'Đã lên lịch' },
@@ -31,22 +30,24 @@ const statusMap = {
 
 interface ScheduleTableProps {
   schedules: Schedule[];
+  teacherMap?: Record<string, { name: string; avatar?: string }>;
+  subjectMap?: Record<string, { name: string; code?: string }>;
 }
 
-export function ScheduleTable({ schedules }: ScheduleTableProps) {
+export function ScheduleTable({ schedules, teacherMap = {}, subjectMap = {} }: ScheduleTableProps) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
   // Lấy tên giáo viên và môn học
   const scheduleDetails = useMemo(() => {
     return schedules.map(schedule => {
-      const teacher = teachers.find(t => t.id === schedule.teacherId);
-      const subject = subjects.find(s => s.id === schedule.subjectId);
+      const teacher = teacherMap[schedule.teacherId];
+      const subject = subjectMap[schedule.subjectId];
       
       return {
         ...schedule,
         teacherName: teacher?.name || 'Chưa phân công',
-        teacherAvatar: '', // No avatar field, use blank or default
+        teacherAvatar: teacher?.avatar || '',
         subjectName: subject?.name || 'Không xác định',
         subjectCode: subject?.code || ''
       };

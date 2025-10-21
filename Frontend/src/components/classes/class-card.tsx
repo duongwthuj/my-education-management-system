@@ -27,10 +27,11 @@ import {
   Trash
 } from '@phosphor-icons/react';
 import { Class } from '@/types';
-import { subjects, teachers } from '@/data';
 
 interface ClassCardProps {
   classItem: Class;
+  subjectName?: string;
+  teacher?: { name: string; avatar?: string } | null;
 }
 
 const statusMap = {
@@ -39,12 +40,7 @@ const statusMap = {
   'completed': { color: 'info', text: 'Đã hoàn thành' }
 };
 
-export const ClassCard = memo(function ClassCard({ classItem }: ClassCardProps) {
-  // Lấy thông tin môn học và giáo viên
-  const subject = subjects.find(s => s.id === classItem.subjectId);
-  const teacher = classItem.teacherId 
-    ? teachers.find(t => t.id === classItem.teacherId)
-    : null;
+export const ClassCard = memo(function ClassCard({ classItem, subjectName, teacher }: ClassCardProps) {
   
   // Tính thời gian đã qua (progress)
   const startDate = new Date(classItem.startDate);
@@ -66,7 +62,7 @@ export const ClassCard = memo(function ClassCard({ classItem }: ClassCardProps) 
     <Card>
       <CardHeader
         title={classItem.name}
-        subheader={`${subject?.name || 'Không xác định'} - ${classItem.location}`}
+        subheader={`${subjectName || 'Không xác định'} - ${classItem.location}`}
         action={
           <Chip
             color={statusMap[classItem.status].color as 'warning' | 'success' | 'info'}
@@ -91,7 +87,7 @@ export const ClassCard = memo(function ClassCard({ classItem }: ClassCardProps) 
                 <Stack direction="row" spacing={1} alignItems="center">
                   <BookBookmark fontSize="var(--icon-fontSize-md)" />
                   <Typography variant="body2">
-                    {subject?.name || 'Không xác định'}
+                    {subjectName || 'Không xác định'}
                   </Typography>
                 </Stack>
               </Grid>

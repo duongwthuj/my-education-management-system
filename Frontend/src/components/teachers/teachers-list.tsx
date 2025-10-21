@@ -10,17 +10,23 @@ import {
   Stack,
   SvgIcon,
   TextField,
-  Typography
+  Typography,
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import { MagnifyingGlass, Plus } from '@phosphor-icons/react';
 import { TeachersTable } from './teachers-table';
-import { teachers } from '@/data';
+import { useTeachers } from '@/hooks/use-teachers';
+import { AddTeacherDialog } from './add-teacher-dialog';
 
 export function TeachersList() {
   const [searchQuery, setSearchQuery] = useState('');
-  const filteredTeachers = teachers.filter(teacher =>
-    teacher.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    teacher.email.toLowerCase().includes(searchQuery.toLowerCase())
+  const [openDialog, setOpenDialog] = useState(false);
+  const { teachers, loading, error, refetch } = useTeachers();
+
+  const filteredTeachers = teachers.filter((teacher) =>
+    (teacher.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (teacher.email || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -58,7 +64,7 @@ export function TeachersList() {
                     color="text.primary"
                     variant="subtitle1"
                   >
-                    {teachers.length}
+                    {loading ? '...' : teachers.length}
                   </Typography>
                 </Stack>
               </Stack>
@@ -66,11 +72,18 @@ export function TeachersList() {
                 <Button
                   startIcon={<Plus fontSize="var(--icon-fontSize-md)" />}
                   variant="contained"
+                  disabled={loading}
+                  onClick={() => setOpenDialog(true)}
                 >
                   Thêm giáo viên
                 </Button>
               </div>
             </Stack>
+            {error && (
+              <Alert severity="error" onClose={refetch}>
+                {error}
+              </Alert>
+            )}
             <Card sx={{ p: 2 }}>
               <Stack
                 direction="row"
@@ -82,6 +95,7 @@ export function TeachersList() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Tìm kiếm giáo viên"
+                  disabled={loading}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -92,15 +106,26 @@ export function TeachersList() {
                     )
                   }}
                 />
-                <Button variant="contained">
+                <Button variant="contained" disabled={loading} onClick={() => refetch()}>
                   Tìm kiếm
                 </Button>
               </Stack>
             </Card>
-            <TeachersTable teachers={filteredTeachers} />
+            {loading ? (
+              <Box display="flex" justifyContent="center" py={4}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <TeachersTable teachers={filteredTeachers} />
+            )}
           </Stack>
         </Container>
       </Box>
+      <AddTeacherDialog 
+        open={openDialog} 
+        onClose={() => setOpenDialog(false)}
+        onSuccess={refetch}
+      />
     </>
   );
 }

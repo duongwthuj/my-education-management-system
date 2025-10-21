@@ -49,16 +49,19 @@ const teacherSchema = new Schema<ITeacherDocument>(
       type: String,
       default: '',
     },
-    subjects: [{
-      type: Schema.Types.ObjectId,
-      ref: 'Subject',
-    }],
+    subjects: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Subject',
+      },
+    ],
   },
   {
     timestamps: true,
     toJSON: {
-      transform: (_doc, ret) => {
-        ret.id = ret._id.toString();
+      transform: (_doc, ret: any) => {
+        // ép kiểu 'any' để tránh lỗi TS18046 và TS2790
+        ret.id = (ret._id as mongoose.Types.ObjectId).toString();
         delete ret._id;
         delete ret.__v;
         return ret;

@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 import { ISchedule } from '../types';
 
 export interface IScheduleDocument extends ISchedule, Document {}
@@ -6,15 +6,15 @@ export interface IScheduleDocument extends ISchedule, Document {}
 const scheduleSchema = new Schema<IScheduleDocument>(
   {
     teacherId: {
-      type: Schema.Types.ObjectId,
+      type: Types.ObjectId,
       ref: 'Teacher',
       required: [true, 'Giáo viên là bắt buộc'],
-    },
+    } as any,
     subjectId: {
-      type: Schema.Types.ObjectId,
+      type: Types.ObjectId,
       ref: 'Subject',
       required: [true, 'Môn học là bắt buộc'],
-    },
+    } as any,
     dayOfWeek: {
       type: String,
       required: [true, 'Ngày trong tuần là bắt buộc'],
@@ -42,7 +42,7 @@ const scheduleSchema = new Schema<IScheduleDocument>(
   {
     timestamps: true,
     toJSON: {
-      transform: (_doc, ret) => {
+      transform: (_doc, ret: any) => {
         ret.id = ret._id.toString();
         delete ret._id;
         delete ret.__v;

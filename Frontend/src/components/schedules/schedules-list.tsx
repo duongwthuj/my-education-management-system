@@ -19,8 +19,11 @@ import {
 import { Plus } from '@phosphor-icons/react';
 import { ScheduleCalendar } from './schedule-calendar';
 import { ScheduleTable } from './schedule-table';
-import { schedules, teachers } from '@/data';
 import { Schedule } from '@/types';
+import { useSchedules } from '@/hooks/use-schedules';
+import { useTeachers } from '@/hooks/use-teachers';
+import { useSubjects } from '@/hooks/use-subjects';
+import { CircularProgress, Alert } from '@mui/material';
 
 const days = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
 
@@ -28,7 +31,10 @@ export function SchedulesList() {
   const [view, setView] = useState(0);
   const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
   const [selectedDay, setSelectedDay] = useState<string>('all');
-  const [filteredSchedules, setFilteredSchedules] = useState<Schedule[]>(schedules);
+  const { schedules, loading, error, refetch } = useSchedules();
+  const { teachers } = useTeachers();
+  const { subjects } = useSubjects();
+  const [filteredSchedules, setFilteredSchedules] = useState<Schedule[]>([]);
 
   // Xử lý lọc lịch dạy
   useEffect(() => {
@@ -45,7 +51,7 @@ export function SchedulesList() {
     }
     
     setFilteredSchedules(filtered);
-  }, [selectedTeacher, selectedDay]);
+  }, [selectedTeacher, selectedDay, schedules]);
 
   const handleViewChange = (event: React.SyntheticEvent, newValue: number) => {
     setView(newValue);
@@ -70,6 +76,9 @@ export function SchedulesList() {
       >
         <Container maxWidth="xl">
           <Stack spacing={3}>
+            {error && (
+              <Alert severity="error" onClose={refetch}>{error}</Alert>
+            )}
             <Stack
               direction="row"
               justifyContent="space-between"
@@ -94,7 +103,7 @@ export function SchedulesList() {
                     color="text.primary"
                     variant="subtitle1"
                   >
-                    {filteredSchedules.length}
+                    {loading ? '...' : filteredSchedules.length}
                   </Typography>
                 </Stack>
               </Stack>
@@ -102,6 +111,7 @@ export function SchedulesList() {
                 <Button
                   startIcon={<Plus fontSize="var(--icon-fontSize-md)" />}
                   variant="contained"
+                  disabled={loading}
                 >
                   Thêm lịch
                 </Button>
@@ -157,8 +167,16 @@ export function SchedulesList() {
                   </FormControl>
                 </Stack>
 
-                {view === 0 ? (
-                  <ScheduleTable schedules={filteredSchedules} />
+                {loading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : view === 0 ? (
+                  <ScheduleTable 
+                    schedules={filteredSchedules}
+                    teacherMap={teachers.reduce((acc, t) => { acc[t.id] = { name: t.name, avatar: t.avatar }; return acc; }, {} as Record<string, { name: string; avatar?: string }>)}
+                    subjectMap={subjects.reduce((acc, s) => { acc[s.id] = { name: s.name, code: s.code }; return acc; }, {} as Record<string, { name: string; code?: string }>)}
+                  />
                 ) : (
                   <ScheduleCalendar schedules={filteredSchedules} />
                 )}

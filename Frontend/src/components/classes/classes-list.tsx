@@ -20,12 +20,18 @@ import {
 import { Grid } from '@/components/common/grid';
 import { MagnifyingGlass, Plus } from '@phosphor-icons/react';
 import { ClassCard } from './class-card';
-import { classes } from '@/data';
 import { Class } from '@/types';
+import { useClasses } from '@/hooks/use-classes';
+import { useSubjects } from '@/hooks/use-subjects';
+import { useTeachers } from '@/hooks/use-teachers';
+import { CircularProgress, Alert } from '@mui/material';
 
 export function ClassesList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const { classes, loading, error, refetch } = useClasses();
+  const { subjects } = useSubjects();
+  const { teachers } = useTeachers();
   
   // Lọc các lớp theo trạng thái và từ khóa tìm kiếm
   const filteredClasses = classes.filter(cls => {
@@ -49,6 +55,16 @@ export function ClassesList() {
     active: classes.filter(c => c.status === 'active').length,
     completed: classes.filter(c => c.status === 'completed').length,
   };
+
+  // Build lookup maps
+  const subjectMap = subjects.reduce<Record<string, { name: string }>>((acc, s) => {
+    acc[s.id] = { name: s.name };
+    return acc;
+  }, {});
+  const teacherMap = teachers.reduce<Record<string, { name: string; avatar?: string }>>((acc, t) => {
+    acc[t.id] = { name: t.name, avatar: t.avatar };
+    return acc;
+  }, {});
   
   const handleStatusChange = (event: SelectChangeEvent) => {
     setStatusFilter(event.target.value);
@@ -65,6 +81,11 @@ export function ClassesList() {
       >
         <Container maxWidth="xl">
           <Stack spacing={3}>
+            {error && (
+              <Alert severity="error" onClose={refetch}>
+                {error}
+              </Alert>
+            )}
             <Stack
               direction="row"
               justifyContent="space-between"
@@ -89,7 +110,7 @@ export function ClassesList() {
                     color="text.primary"
                     variant="subtitle1"
                   >
-                    {classes.length}
+                    {loading ? '...' : classes.length}
                   </Typography>
                 </Stack>
               </Stack>
@@ -97,6 +118,7 @@ export function ClassesList() {
                 <Button
                   startIcon={<Plus fontSize="var(--icon-fontSize-md)" />}
                   variant="contained"
+                  disabled={loading}
                 >
                   Thêm lớp mới
                 </Button>
@@ -115,6 +137,7 @@ export function ClassesList() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Tìm kiếm lớp học"
+                  disabled={loading}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -148,19 +171,29 @@ export function ClassesList() {
             </Card>
 
             <Box sx={{ pt: 3 }}>
-              <Grid container spacing={3}>
-                {filteredClasses.map((classItem) => (
-                  <Grid
-                    key={classItem.id}
-                    item
-                    md={6}
-                    sm={12}
-                    xs={12}
-                  >
-
-                  </Grid>
-                ))}
-              </Grid>
+              {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <Grid container spacing={3}>
+                  {filteredClasses.map((classItem) => (
+                    <Grid
+                      key={classItem.id}
+                      item
+                      md={6}
+                      sm={12}
+                      xs={12}
+                    >
+                      <ClassCard 
+                        classItem={classItem}
+                        subjectName={subjectMap[classItem.subjectId]?.name}
+                        teacher={classItem.teacherId ? teacherMap[classItem.teacherId] : null}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
               
               {filteredClasses.length === 0 && (
                 <Box

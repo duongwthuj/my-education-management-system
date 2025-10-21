@@ -18,7 +18,6 @@ import {
 } from '@mui/material';
 import { Grid } from '@/components/common/grid';
 import { Schedule } from '@/types';
-import { teachers, subjects } from '@/data';
 import { ArrowLeft, ArrowRight, Clock, MapPin, Info } from '@phosphor-icons/react';
 
 const days = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
@@ -52,9 +51,11 @@ const generateSubjectColor = (id: string) => {
 
 interface ScheduleCalendarProps {
   schedules: Schedule[];
+  teacherMap?: Record<string, { name: string; avatar?: string }>;
+  subjectMap?: Record<string, { name: string; code?: string }>;
 }
 
-export function ScheduleCalendar({ schedules }: ScheduleCalendarProps) {
+export function ScheduleCalendar({ schedules, teacherMap = {}, subjectMap = {} }: ScheduleCalendarProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [currentWeek, setCurrentWeek] = useState(0); // 0 = tuần hiện tại
@@ -62,9 +63,9 @@ export function ScheduleCalendar({ schedules }: ScheduleCalendarProps) {
   // Lấy chi tiết lịch dạy với thông tin màu sắc
   const scheduleDetails = useMemo(() => {
     return schedules.map(schedule => {
-      const teacher = teachers.find(t => t.id === schedule.teacherId);
-      const subject = subjects.find(s => s.id === schedule.subjectId);
-      const subjectColor = subject ? generateSubjectColor(subject.id) : theme.palette.grey[500];
+      const teacher = teacherMap[schedule.teacherId];
+      const subject = subjectMap[schedule.subjectId];
+      const subjectColor = subject ? generateSubjectColor(schedule.subjectId) : theme.palette.grey[500];
       
       return {
         ...schedule,

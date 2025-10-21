@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 import { ISubject } from '../types';
 
 export interface ISubjectDocument extends ISubject, Document {}
@@ -31,14 +31,14 @@ const subjectSchema = new Schema<ISubjectDocument>(
       required: [true, 'Cấp độ là bắt buộc'],
     },
     teachers: [{
-      type: Schema.Types.ObjectId,
+      type: Types.ObjectId,
       ref: 'Teacher',
-    }],
+    }] as any,
   },
   {
     timestamps: true,
     toJSON: {
-      transform: (_doc, ret) => {
+      transform: (_doc, ret: any) => {
         ret.id = ret._id.toString();
         delete ret._id;
         delete ret.__v;

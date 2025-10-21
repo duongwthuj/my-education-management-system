@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 import { IClass } from '../types';
 
 export interface IClassDocument extends IClass, Document {}
@@ -11,10 +11,10 @@ const classSchema = new Schema<IClassDocument>(
       trim: true,
     },
     subjectId: {
-      type: Schema.Types.ObjectId,
+      type: Types.ObjectId,
       ref: 'Subject',
-      required: [true, 'Môn học là bắt buộc'],
-    },
+      required: true,
+    } as any,
     startDate: {
       type: String,
       required: [true, 'Ngày bắt đầu là bắt buộc'],
@@ -34,23 +34,23 @@ const classSchema = new Schema<IClassDocument>(
       default: 'pending',
     },
     teacherId: {
-      type: Schema.Types.ObjectId,
+      type: Types.ObjectId,
       ref: 'Teacher',
-    },
+    } as any,
     description: {
       type: String,
-      required: [true, 'Mô tả là bắt buộc'],
+      required: true,
     },
     location: {
       type: String,
-      required: [true, 'Địa điểm là bắt buộc'],
+      required: true,
       trim: true,
     },
   },
   {
     timestamps: true,
     toJSON: {
-      transform: (_doc, ret) => {
+      transform: (_doc, ret: any) => {
         ret.id = ret._id.toString();
         delete ret._id;
         delete ret.__v;

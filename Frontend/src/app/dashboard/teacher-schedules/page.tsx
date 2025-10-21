@@ -6,19 +6,82 @@ import {
   Stack,
   Typography,
   Card,
-  Tab,
-  Tabs
+  CircularProgress,
+  Alert
 } from '@mui/material';
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { TeacherScheduleCalendar } from '@/components/schedules/teacher-schedule-calendar';
-import { teacherScheduleData } from '@/data';
+import { useSchedules } from '@/hooks/use-schedules';
+import { useTeachers } from '@/hooks/use-teachers';
+import { TeacherSchedule } from '@/types';
 
 export default function TeacherSchedulePage() {
-  const [view, setView] = useState(0);
+  const { schedules, loading: schedulesLoading, error: schedulesError } = useSchedules();
+  const { teachers, loading: teachersLoading, error: teachersError } = useTeachers();
 
-  const handleViewChange = (event: React.SyntheticEvent, newValue: number) => {
-    setView(newValue);
-  };
+  const teacherScheduleData = useMemo(() => {
+    if (!schedules.length || !teachers.length) return {};
+
+    const teacherMap = new Map(teachers.map(t => [t.id, t]));
+    const data: TeacherSchedule = {};
+
+    schedules.forEach((schedule) => {
+      const teacher = teacherMap.get(schedule.teacherId);
+      if (!teacher) return;
+
+      const teacherName = teacher.name;
+      if (!data[teacherName]) {
+        data[teacherName] = [];
+      }
+
+      // Parse date and create day entry
+      const date = new Date(schedule.startTime);
+      const dateStr = date.toISOString().split('T')[0];
+      const weekdayNum = date.getDay();
+      const weekdayLabels = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+      const weekday = weekdayLabels[weekdayNum];
+
+      // Find or create day entry
+      let dayEntry = data[teacherName].find(d => d.date === dateStr);
+      if (!dayEntry) {
+        dayEntry = {
+          date: dateStr,
+          weekday,
+          slots: []
+        };
+        data[teacherName].push(dayEntry);
+      }
+
+      // Add time slot
+      const startTime = new Date(schedule.startTime);
+      const endTime = new Date(schedule.endTime);
+      const startHours = startTime.getHours();
+      const endHours = endTime.getHours();
+
+      let period = 'morning';
+      if (startHours >= 17) period = 'evening';
+      else if (startHours >= 13) period = 'afternoon';
+
+      dayEntry.slots.push({
+        time: `${String(startHours).padStart(2, '0')}:${String(startTime.getMinutes()).padStart(2, '0')} - ${String(endHours).padStart(2, '0')}:${String(endTime.getMinutes()).padStart(2, '0')}`,
+        status: 'available',
+        period: 'afternoon'
+      });
+    });
+
+    // Sort days by date and slots by time
+    Object.values(data).forEach(days => {
+      days.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      days.forEach(day => {
+        day.slots.sort((a, b) => a.time.localeCompare(b.time));
+      });
+    });
+
+    return data;
+  }, [schedules, teachers]);
+
+  const loading = schedulesLoading || teachersLoading;
+  const error = schedulesError || teachersError;
 
   return (
     <>
@@ -51,7 +114,18 @@ export default function TeacherSchedulePage() {
 
             <Card>
               <Box sx={{ p: 3 }}>
-                <TeacherScheduleCalendar scheduleData={teacherScheduleData} />
+                {error && (
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {error}
+                  </Alert>
+                )}
+                {loading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <TeacherScheduleCalendar scheduleData={teacherScheduleData} />
+                )}
               </Box>
             </Card>
           </Stack>

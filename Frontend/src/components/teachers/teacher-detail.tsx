@@ -29,8 +29,10 @@ import {
   GraduationCap,
   BookBookmark
 } from '@phosphor-icons/react';
-import { teachers, subjects } from '@/data';
 import { Teacher, Subject } from '@/types';
+import { useTeacher } from '@/hooks/use-teachers';
+import { useSubjects } from '@/hooks/use-subjects';
+import { CircularProgress, Alert } from '@mui/material';
 
 interface TeacherDetailProps {
   teacherId: string;
@@ -40,27 +42,55 @@ export function TeacherDetail({ teacherId }: TeacherDetailProps) {
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [teacherSubjects, setTeacherSubjects] = useState<Subject[]>([]);
   const [tabValue, setTabValue] = useState(0);
+  const { teacher: teacherData, loading, error, refetch } = useTeacher(teacherId);
+  const { subjects, loading: loadingSubjects } = useSubjects();
 
   useEffect(() => {
-    // Tìm thông tin giáo viên từ ID
-    const foundTeacher = teachers.find(t => t.id === teacherId);
-    setTeacher(foundTeacher || null);
-
-    // Tìm các môn học mà giáo viên có thể dạy
-    if (foundTeacher) {
-      const foundSubjects = subjects.filter(subject => 
-        foundTeacher.subjects.includes(subject.id)
+    if (teacherData) {
+      setTeacher(teacherData);
+      const foundSubjects = subjects.filter((subject) =>
+        teacherData.subjects.includes(subject.id)
       );
       setTeacherSubjects(foundSubjects);
     }
-  }, [teacherId]);
+  }, [teacherData, subjects]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
+  if (loading || loadingSubjects) {
+    return (
+      <Box component="main" sx={{ flexGrow: 1, py: 8 }}>
+        <Container maxWidth="lg">
+          <Box display="flex" justifyContent="center" py={6}>
+            <CircularProgress />
+          </Box>
+        </Container>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box component="main" sx={{ flexGrow: 1, py: 8 }}>
+        <Container maxWidth="lg">
+          <Alert severity="error" onClose={refetch}>
+            {error}
+          </Alert>
+        </Container>
+      </Box>
+    );
+  }
+
   if (!teacher) {
-    return <Typography>Không tìm thấy thông tin giáo viên</Typography>;
+    return (
+      <Box component="main" sx={{ flexGrow: 1, py: 8 }}>
+        <Container maxWidth="lg">
+          <Typography>Không tìm thấy thông tin giáo viên</Typography>
+        </Container>
+      </Box>
+    );
   }
 
   return (
