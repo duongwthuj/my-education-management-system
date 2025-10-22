@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Alert,
   Box,
@@ -9,6 +9,10 @@ import {
   Chip,
   CircularProgress,
   Container,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   InputAdornment,
   Stack,
   SvgIcon,
@@ -21,13 +25,24 @@ import { MagnifyingGlass, Plus, FunnelSimple } from '@phosphor-icons/react';
 import { SubjectCard } from './subject-card';
 import { useSubjects } from '@/hooks/use-subjects';
 import { AddSubjectDialog } from './add-subject-dialog';
+import { subjectsService } from '@/services/subjects.service';
+import { Subject } from '@/types';
 
 export function SubjectsList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedLevel, setSelectedLevel] = useState('all');
   const [openDialog, setOpenDialog] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const { subjects, loading, error, refetch } = useSubjects();
+
+  // Refetch subjects khi component mount để lấy dữ liệu mới nhất
+  useEffect(() => {
+    refetch();
+  }, []);
 
   const categories = useMemo(() => {
     const unique = Array.from(new Set(subjects.map((s) => s.category)));
@@ -61,6 +76,28 @@ export function SubjectsList() {
       }, {} as Record<string, number>);
     return { total: subjects.length, filtered: filteredSubjects.length, levelCount, categoryCount };
   }, [subjects, filteredSubjects, categories]);
+
+  const handleDeleteClick = (subject: Subject) => {
+    setSelectedSubject(subject);
+    setDeleteError(null);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedSubject) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await subjectsService.delete(selectedSubject.id);
+      setDeleteDialogOpen(false);
+      setSelectedSubject(null);
+      refetch();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Có lỗi xảy ra');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <Box component="main" sx={{ flexGrow: 1, py: 8 }}>
@@ -164,7 +201,7 @@ export function SubjectsList() {
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: 3 }}>
                 {filteredSubjects.map((subject) => (
                   <Box key={subject.id}>
-                    <SubjectCard subject={subject} />
+                    <SubjectCard subject={subject} onDeleteClick={handleDeleteClick} />
                   </Box>
                 ))}
               </Box>
@@ -188,6 +225,24 @@ export function SubjectsList() {
         onClose={() => setOpenDialog(false)}
         onSuccess={refetch}
       />
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Xóa môn học</DialogTitle>
+        <DialogContent>
+          {deleteError && <Alert severity="error" sx={{ mb: 2 }}>{deleteError}</Alert>}
+          <Typography>
+            Bạn có chắc chắn muốn xóa môn học <strong>{selectedSubject?.name}</strong> không?
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Hành động này không thể hoàn tác.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>Hủy</Button>
+          <Button onClick={handleConfirmDelete} variant="contained" color="error" disabled={deleting}>
+            {deleting ? 'Đang xóa...' : 'Xóa'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

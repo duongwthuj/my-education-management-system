@@ -116,7 +116,7 @@ export function TeachersList() {
                 <CircularProgress />
               </Box>
             ) : (
-              <TeachersTable teachers={filteredTeachers} />
+              <TeachersTable teachers={filteredTeachers} onRefresh={refetch} />
             )}
           </Stack>
         </Container>

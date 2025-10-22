@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { Subject } from '../models';
+import { Subject, Teacher } from '../models';
 
 const router = Router();
 
@@ -91,6 +91,13 @@ router.delete('/:id', async (req: Request, res: Response) => {
     if (!subject) {
       return res.status(404).json({ success: false, error: 'Không tìm thấy môn học' });
     }
+
+    // Xóa subject khỏi danh sách subjects của tất cả các giáo viên
+    await Teacher.updateMany(
+      { subjects: req.params.id },
+      { $pull: { subjects: req.params.id } }
+    );
+
     res.json({ success: true, message: 'Xóa môn học thành công' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });

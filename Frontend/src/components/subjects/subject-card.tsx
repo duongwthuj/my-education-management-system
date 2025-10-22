@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, memo } from 'react';
+import NextLink from 'next/link';
 import {
   Avatar,
   Box,
@@ -28,6 +29,7 @@ import { Subject } from '@/types';
 
 interface SubjectCardProps {
   subject: Subject;
+  onDeleteClick?: (subject: Subject) => void;
 }
 
 const levelMap = {
@@ -36,7 +38,7 @@ const levelMap = {
   'advanced': { color: 'error', text: 'Nâng cao', progress: 100 }
 };
 
-export const SubjectCard = memo(function SubjectCard({ subject }: SubjectCardProps) {
+export const SubjectCard = memo(function SubjectCard({ subject, onDeleteClick }: SubjectCardProps) {
   const teachersCount = subject.teachers.length;
   const [elevated, setElevated] = useState(false);
   
@@ -148,7 +150,11 @@ export const SubjectCard = memo(function SubjectCard({ subject }: SubjectCardPro
       <CardActions sx={{ justifyContent: 'space-between', px: 2 }}>
         <Stack direction="row" spacing={1}>
           <Tooltip title="Xem chi tiết">
-            <IconButton size="small">
+            <IconButton 
+              size="small"
+              component={NextLink}
+              href={`/dashboard/subjects/${subject.id}`}
+            >
               <Eye fontSize="var(--icon-fontSize-md)" />
             </IconButton>
           </Tooltip>
@@ -158,13 +164,19 @@ export const SubjectCard = memo(function SubjectCard({ subject }: SubjectCardPro
             </IconButton>
           </Tooltip>
           <Tooltip title="Xóa">
-            <IconButton size="small" color="error">
+            <IconButton 
+              size="small" 
+              color="error"
+              onClick={() => onDeleteClick?.(subject)}
+            >
               <Trash fontSize="var(--icon-fontSize-md)" />
             </IconButton>
           </Tooltip>
         </Stack>
         
         <Button
+          component={NextLink}
+          href={`/dashboard/subjects/${subject.id}`}
           variant="outlined"
           size="small"
           startIcon={<Eye fontSize="var(--icon-fontSize-sm)" />}

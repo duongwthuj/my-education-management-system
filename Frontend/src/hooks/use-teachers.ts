@@ -13,12 +13,22 @@ export function useTeachers() {
     setLoading(true);
     setError(null);
     
-    const response = await teachersService.getAll();
-    
-    if (response.success && response.data) {
-      setTeachers(response.data);
-    } else {
-      setError(response.error || 'Failed to fetch teachers');
+    try {
+      const response = await teachersService.getAll();
+      
+      if (response.success && response.data) {
+        // Map _id to id for consistency
+        const teachers = response.data.map((teacher: any) => ({
+          ...teacher,
+          id: teacher._id || teacher.id
+        }));
+        setTeachers(teachers);
+      } else {
+        setError(response.error || 'Failed to fetch teachers');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch teachers');
+      console.error('❌ Error fetching teachers:', err);
     }
     
     setLoading(false);
@@ -50,7 +60,13 @@ export function useTeacher(id: string) {
     const response = await teachersService.getById(id);
     
     if (response.success && response.data) {
-      setTeacher(response.data);
+      // Map _id to id for consistency
+      const data = response.data as any;
+      const mappedTeacher = {
+        ...response.data,
+        id: data._id || response.data.id || id
+      };
+      setTeacher(mappedTeacher);
     } else {
       setError(response.error || 'Failed to fetch teacher');
     }

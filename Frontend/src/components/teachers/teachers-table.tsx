@@ -16,10 +16,17 @@ import {
   Typography,
   IconButton,
   Tooltip,
-  Link
+  Link,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Alert
 } from '@mui/material';
 import { ArrowsClockwise, Eye, PencilSimple, Trash } from '@phosphor-icons/react';
 import { Teacher } from '@/types';
+import { teachersService } from '@/services/teachers.service';
 
 const statusMap = {
   'active': { color: 'success', text: 'Đang hoạt động' },
@@ -29,11 +36,16 @@ const statusMap = {
 
 interface TeachersTableProps {
   teachers: Teacher[];
+  onRefresh?: () => void;
 }
 
-export function TeachersTable({ teachers }: TeachersTableProps) {
+export function TeachersTable({ teachers, onRefresh }: TeachersTableProps) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
@@ -42,6 +54,30 @@ export function TeachersTable({ teachers }: TeachersTableProps) {
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
+  };
+
+  const handleDeleteClick = (teacher: Teacher) => {
+    setSelectedTeacher(teacher);
+    setDeleteError(null);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedTeacher) return;
+
+    setDeleting(true);
+    setDeleteError(null);
+
+    try {
+      await teachersService.delete(selectedTeacher.id);
+      setDeleteDialogOpen(false);
+      setSelectedTeacher(null);
+      onRefresh?.();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Có lỗi xảy ra khi xóa giáo viên');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -140,7 +176,7 @@ export function TeachersTable({ teachers }: TeachersTableProps) {
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Xóa">
-                      <IconButton>
+                      <IconButton onClick={() => handleDeleteClick(teacher)}>
                         <Trash fontSize="var(--icon-fontSize-md)" />
                       </IconButton>
                     </Tooltip>
@@ -160,6 +196,26 @@ export function TeachersTable({ teachers }: TeachersTableProps) {
         onRowsPerPageChange={handleChangeRowsPerPage}
         labelRowsPerPage="Số hàng mỗi trang:"
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Xóa giáo viên</DialogTitle>
+        <DialogContent>
+          {deleteError && <Alert severity="error" sx={{ mb: 2 }}>{deleteError}</Alert>}
+          <Typography>
+            Bạn có chắc chắn muốn xóa giáo viên <strong>{selectedTeacher?.name}</strong> không?
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            Hành động này không thể hoàn tác.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>Hủy</Button>
+          <Button onClick={handleConfirmDelete} variant="contained" color="error" disabled={deleting}>
+            {deleting ? 'Đang xóa...' : 'Xóa'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 }

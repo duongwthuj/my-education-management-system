@@ -46,6 +46,15 @@ const scheduleSchema = new Schema<IScheduleDocument>(
         ret.id = ret._id.toString();
         delete ret._id;
         delete ret.__v;
+        
+        // Convert ObjectId references to strings
+        if (ret.teacherId && typeof ret.teacherId === 'object') {
+          ret.teacherId = ret.teacherId._id ? ret.teacherId._id.toString() : ret.teacherId.toString();
+        }
+        if (ret.subjectId && typeof ret.subjectId === 'object') {
+          ret.subjectId = ret.subjectId._id ? ret.subjectId._id.toString() : ret.subjectId.toString();
+        }
+        
         return ret;
       },
     },

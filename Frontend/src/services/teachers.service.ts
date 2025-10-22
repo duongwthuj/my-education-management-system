@@ -3,13 +3,22 @@ import type { Teacher } from '@/types/teacher';
 
 export interface CreateTeacherDTO {
   name: string;
+  email: string;
   phone: string;
+  address?: string;
+  education?: string;
+  bio?: string;
+  joinDate?: string;
   subjects: string[];
 }
 
 export interface UpdateTeacherDTO {
   name?: string;
+  email?: string;
   phone?: string;
+  address?: string;
+  education?: string;
+  bio?: string;
   subjects?: string[];
 }
 

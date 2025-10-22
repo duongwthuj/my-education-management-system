@@ -6,6 +6,10 @@ import {
   Button,
   Card,
   Container,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   InputAdornment,
   Stack,
   SvgIcon,
@@ -15,7 +19,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  SelectChangeEvent
+  SelectChangeEvent,
+  Alert
 } from '@mui/material';
 import { Grid } from '@/components/common/grid';
 import { MagnifyingGlass, Plus } from '@phosphor-icons/react';
@@ -24,11 +29,16 @@ import { Class } from '@/types';
 import { useClasses } from '@/hooks/use-classes';
 import { useSubjects } from '@/hooks/use-subjects';
 import { useTeachers } from '@/hooks/use-teachers';
-import { CircularProgress, Alert } from '@mui/material';
+import { classesService } from '@/services/classes.service';
+import { CircularProgress } from '@mui/material';
 
 export function ClassesList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<Class | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const { classes, loading, error, refetch } = useClasses();
   const { subjects } = useSubjects();
   const { teachers } = useTeachers();
@@ -68,6 +78,28 @@ export function ClassesList() {
   
   const handleStatusChange = (event: SelectChangeEvent) => {
     setStatusFilter(event.target.value);
+  };
+
+  const handleDeleteClick = (classItem: Class) => {
+    setSelectedClass(classItem);
+    setDeleteError(null);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedClass) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await classesService.delete(selectedClass.id);
+      setDeleteDialogOpen(false);
+      setSelectedClass(null);
+      refetch();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Có lỗi xảy ra');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -189,6 +221,7 @@ export function ClassesList() {
                         classItem={classItem}
                         subjectName={subjectMap[classItem.subjectId]?.name}
                         teacher={classItem.teacherId ? teacherMap[classItem.teacherId] : null}
+                        onDeleteClick={handleDeleteClick}
                       />
                     </Grid>
                   ))}
@@ -215,6 +248,24 @@ export function ClassesList() {
           </Stack>
         </Container>
       </Box>
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Xóa lớp học</DialogTitle>
+        <DialogContent>
+          {deleteError && <Alert severity="error" sx={{ mb: 2 }}>{deleteError}</Alert>}
+          <Typography>
+            Bạn có chắc chắn muốn xóa lớp <strong>{selectedClass?.name}</strong> không?
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Hành động này không thể hoàn tác.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>Hủy</Button>
+          <Button onClick={handleConfirmDelete} variant="contained" color="error" disabled={deleting}>
+            {deleting ? 'Đang xóa...' : 'Xóa'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

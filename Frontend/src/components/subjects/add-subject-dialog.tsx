@@ -47,8 +47,8 @@ export function AddSubjectDialog({ open, onClose, onSuccess }: AddSubjectDialogP
   };
 
   const handleSubmit = async () => {
-    if (!formData.name.trim() || !formData.code.trim()) {
-      setError('Vui lòng nhập tên và mã môn học');
+    if (!formData.name.trim() || !formData.code.trim() || !formData.category.trim() || !formData.description.trim()) {
+      setError('Vui lòng nhập tên, mã, loại và mô tả môn học');
       return;
     }
 
@@ -56,7 +56,13 @@ export function AddSubjectDialog({ open, onClose, onSuccess }: AddSubjectDialogP
     setError(null);
 
     try {
-      await subjectsService.create(formData);
+      await subjectsService.create({
+        name: formData.name.trim(),
+        code: formData.code.trim(),
+        category: formData.category.trim(),
+        level: formData.level as 'beginner' | 'intermediate' | 'advanced',
+        description: formData.description.trim()
+      });
       setFormData({
         name: '',
         code: '',
@@ -118,6 +124,7 @@ export function AddSubjectDialog({ open, onClose, onSuccess }: AddSubjectDialogP
             value={formData.category}
             onChange={handleChange}
             disabled={loading}
+            required
             placeholder="VD: Toán, Lý, Hóa..."
           />
           <TextField
@@ -142,6 +149,7 @@ export function AddSubjectDialog({ open, onClose, onSuccess }: AddSubjectDialogP
             value={formData.description}
             onChange={handleChange}
             disabled={loading}
+            required
             multiline
             rows={3}
           />

@@ -8,7 +8,6 @@ import {
   Button,
   Card,
   CardContent,
-  Container,
   Divider,
   Stack,
   Typography,
@@ -18,21 +17,33 @@ import {
   ListItem,
   ListItemText,
   ListItemAvatar,
-  Chip
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import { Grid } from '@/components/common/grid';
 import {
   Phone,
   EnvelopeSimple,
   MapPin,
-  Calendar,
   GraduationCap,
-  BookBookmark
+  BookBookmark,
+  PencilSimple,
+  ArrowLeft,
+  Clock
 } from '@phosphor-icons/react';
 import { Teacher, Subject } from '@/types';
 import { useTeacher } from '@/hooks/use-teachers';
 import { useSubjects } from '@/hooks/use-subjects';
-import { CircularProgress, Alert } from '@mui/material';
+import { useSchedules } from '@/hooks/use-schedules';
+import { EditTeacherDialog } from './edit-teacher-dialog';
+import { AddSubjectToTeacherDialog } from './add-subject-to-teacher-dialog';
 
 interface TeacherDetailProps {
   teacherId: string;
@@ -41,304 +52,276 @@ interface TeacherDetailProps {
 export function TeacherDetail({ teacherId }: TeacherDetailProps) {
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [teacherSubjects, setTeacherSubjects] = useState<Subject[]>([]);
+  const [teacherSchedules, setTeacherSchedules] = useState<any[]>([]);
   const [tabValue, setTabValue] = useState(0);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addSubjectDialogOpen, setAddSubjectDialogOpen] = useState(false);
   const { teacher: teacherData, loading, error, refetch } = useTeacher(teacherId);
   const { subjects, loading: loadingSubjects } = useSubjects();
+  const { schedules, loading: loadingSchedules } = useSchedules();
 
   useEffect(() => {
     if (teacherData) {
       setTeacher(teacherData);
-      const foundSubjects = subjects.filter((subject) =>
-        teacherData.subjects.includes(subject.id)
-      );
+      const foundSubjects = subjects.filter((s) => teacherData.subjects.includes(s.id));
       setTeacherSubjects(foundSubjects);
     }
   }, [teacherData, subjects]);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
+  useEffect(() => {
+    if (teacher && schedules.length > 0) {
+      const filtered = schedules.filter(s => String(s.teacherId) === String(teacher.id));
+      setTeacherSchedules(filtered);
+    }
+  }, [teacher, schedules]);
 
-  if (loading || loadingSubjects) {
+  if (loading || loadingSubjects || loadingSchedules) {
     return (
-      <Box component="main" sx={{ flexGrow: 1, py: 8 }}>
-        <Container maxWidth="lg">
-          <Box display="flex" justifyContent="center" py={6}>
-            <CircularProgress />
-          </Box>
-        </Container>
+      <Box sx={{ flexGrow: 1, py: 8, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <CircularProgress />
       </Box>
     );
   }
 
   if (error) {
     return (
-      <Box component="main" sx={{ flexGrow: 1, py: 8 }}>
-        <Container maxWidth="lg">
-          <Alert severity="error" onClose={refetch}>
-            {error}
-          </Alert>
-        </Container>
+      <Box sx={{ flexGrow: 1, py: 8 }}>
+        <Alert severity="error" onClose={refetch}>
+          {error}
+        </Alert>
       </Box>
     );
   }
 
   if (!teacher) {
     return (
-      <Box component="main" sx={{ flexGrow: 1, py: 8 }}>
-        <Container maxWidth="lg">
-          <Typography>Không tìm thấy thông tin giáo viên</Typography>
-        </Container>
+      <Box sx={{ flexGrow: 1, py: 8 }}>
+        <Typography>Không tìm thấy giáo viên</Typography>
       </Box>
     );
   }
+
+  const schedulesByDay = teacherSchedules.reduce((acc: any, schedule) => {
+    if (!acc[schedule.dayOfWeek]) acc[schedule.dayOfWeek] = [];
+    acc[schedule.dayOfWeek].push(schedule);
+    return acc;
+  }, {});
 
   return (
     <Box
       component="main"
       sx={{
         flexGrow: 1,
-        py: 8
+        height: 'calc(100vh - 64px)', // trừ chiều cao header nếu có
+        overflow: 'hidden',
+        px: 3,
+        py: 3,
+        display: 'flex',
+        flexDirection: 'column'
       }}
     >
-      <Container maxWidth="lg">
-        <Stack spacing={3}>
-          <div>
-            <Typography variant="h4">
-              Hồ sơ giáo viên
+      <Stack spacing={3} sx={{ flexGrow: 1, overflow: 'hidden' }}>
+        {/* Header */}
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+          <Stack spacing={1}>
+            <Button component={NextLink} href="/dashboard/teachers" startIcon={<ArrowLeft />} sx={{ ml: -1 }}>
+              Quay lại
+            </Button>
+            <Typography variant="h4">Hồ sơ giáo viên</Typography>
+            <Typography color="text.secondary" variant="subtitle2">
+              Thông tin chi tiết và lịch dạy
             </Typography>
-          </div>
-          <div>
-            <Grid
-              container
-              spacing={3}
-            >
-              {/* @ts-ignore - MUI v7 Grid type issues */}
-              {/* @ts-ignore - MUI v7 Grid type issues */}
-              <Grid
-                item
-                xs={12}
-                md={6}
-                lg={8}
-              >
-                <Card>
-                  <CardContent>
-                    <Box
-                      sx={{
-                        alignItems: 'center',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        textAlign: 'center'
-                      }}
-                    >
-                      <Avatar
-                        src={teacher.avatar}
-                        sx={{
-                          height: 80,
-                          width: 80,
-                          mb: 2
-                        }}
-                      />
-                      <Typography
-                        gutterBottom
-                        variant="h5"
-                      >
-                        {teacher.name}
-                      </Typography>
-                      <Typography
-                        color="text.secondary"
-                        variant="body2"
-                      >
-                        {teacher.education}
-                      </Typography>
-                      <Box sx={{ mt: 2 }}>
-                        <Chip
-                          label={
-                            teacher.status === 'active' ? 'Đang hoạt động' :
-                            teacher.status === 'on-leave' ? 'Tạm nghỉ' : 
-                            'Ngưng hoạt động'
-                          }
-                          color={
-                            teacher.status === 'active' ? 'success' :
-                            teacher.status === 'on-leave' ? 'warning' : 
-                            'error'
-                          }
-                        />
-                      </Box>
-                    </Box>
-                  </CardContent>
-                  <Divider />
-                  <CardContent>
-                    <Stack
-                      spacing={2}
-                      sx={{ mt: 1 }}
-                    >
-                      <Stack
-                        alignItems="flex-start"
-                        direction="row"
-                        spacing={1}
-                      >
-                        <Phone fontSize="var(--icon-fontSize-md)" />
-                        <Typography variant="body2">
-                          {teacher.phone}
-                        </Typography>
-                      </Stack>
-                      <Stack
-                        alignItems="flex-start"
-                        direction="row"
-                        spacing={1}
-                      >
-                        <EnvelopeSimple fontSize="var(--icon-fontSize-md)" />
-                        <Typography variant="body2">
-                          {teacher.email}
-                        </Typography>
-                      </Stack>
-                      <Stack
-                        alignItems="flex-start"
-                        direction="row"
-                        spacing={1}
-                      >
-                        <MapPin fontSize="var(--icon-fontSize-md)" />
-                        <Typography variant="body2">
-                          {teacher.address}
-                        </Typography>
-                      </Stack>
-                      <Stack
-                        alignItems="flex-start"
-                        direction="row"
-                        spacing={1}
-                      >
-                        <Calendar fontSize="var(--icon-fontSize-md)" />
-                        <Typography variant="body2">
-                          Ngày vào: {teacher.joinDate}
-                        </Typography>
-                      </Stack>
+          </Stack>
+          <Button onClick={() => setEditDialogOpen(true)} variant="contained" startIcon={<PencilSimple />}>
+            Chỉnh sửa
+          </Button>
+        </Stack>
+
+        {/* Layout Flex cho toàn bộ nội dung */}
+        <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
+          {/* Cột trái (thông tin cá nhân) */}
+          <Box sx={{ flexBasis: 320, flexShrink: 0, mr: 3 }}>
+            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                  <Avatar
+                    src={teacher.avatar}
+                    sx={{ height: 100, width: 100, mb: 2, border: '4px solid', borderColor: 'primary.lighter' }}
+                  />
+                  <Typography variant="h5" sx={{ mb: 1 }}>{teacher.name}</Typography>
+                  <Typography color="text.secondary" variant="body2" sx={{ mb: 2 }}>
+                    {teacher.education}
+                  </Typography>
+                  <Chip
+                    label={teacher.status === 'active' ? 'Đang hoạt động' : teacher.status === 'on-leave' ? 'Tạm nghỉ' : 'Ngưng'}
+                    color={teacher.status === 'active' ? 'success' : teacher.status === 'on-leave' ? 'warning' : 'error'}
+                  />
+                </Box>
+              </CardContent>
+              <Divider />
+              <CardContent sx={{ flexGrow: 1 }}>
+                <Stack spacing={2}>
+                  <Box>
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>Liên hệ</Typography>
+                    <Stack spacing={1} sx={{ mt: 1 }}>
+                      <Stack direction="row" spacing={1}><Phone /> <Typography>{teacher.phone}</Typography></Stack>
+                      <Stack direction="row" spacing={1}><EnvelopeSimple /> <Typography>{teacher.email}</Typography></Stack>
+                      <Stack direction="row" spacing={1}><MapPin /> <Typography>{teacher.address}</Typography></Stack>
                     </Stack>
-                  </CardContent>
+                  </Box>
                   <Divider />
-                  <Stack
-                    alignItems="center"
-                    direction="row"
-                    justifyContent="space-between"
-                    spacing={2}
-                    sx={{ p: 2 }}
-                  >
-                    <Button
-                      component={NextLink}
-                      href="/dashboard/teachers"
-                      color="inherit"
-                    >
-                      Quay lại
-                    </Button>
-                    <Button variant="contained">
-                      Chỉnh sửa
-                    </Button>
+                  <Box>
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>Thông tin</Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>Ngày vào: {teacher.joinDate}</Typography>
+                  </Box>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* Cột phải (fill toàn bộ phần còn lại) */}
+          <Box sx={{ flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>
+            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant="scrollable" scrollButtons="auto">
+                <Tab label="Mô tả" />
+                <Tab label="Môn học" icon={<BookBookmark />} iconPosition="start" />
+                <Tab label="Lịch dạy" icon={<Clock />} iconPosition="start" />
+              </Tabs>
+              <Divider />
+              <CardContent sx={{ flexGrow: 1, overflowY: 'auto' }}>
+                {/* Tab 0: Mô tả */}
+                {tabValue === 0 && (
+                  <Stack spacing={2}>
+                    <Box>
+                      <Typography variant="h6" sx={{ mb: 1 }}>Giới thiệu</Typography>
+                      <Typography variant="body2" color="text.secondary">{teacher.bio || 'Chưa có thông tin'}</Typography>
+                    </Box>
+                    <Divider />
+                    <Box>
+                      <Typography variant="h6" sx={{ mb: 1 }}>Bằng cấp</Typography>
+                      <Stack direction="row" spacing={1}>
+                        <GraduationCap fontSize="var(--icon-fontSize-md)" />
+                        <Typography variant="body2">{teacher.education}</Typography>
+                      </Stack>
+                    </Box>
                   </Stack>
-                </Card>
-              </Grid>
-              <Grid
-                item
-                xs={12}
-                md={8}
-                lg={8}
-              >
-                <Card>
-                  <Tabs
-                    value={tabValue}
-                    onChange={handleTabChange}
-                  >
-                    <Tab label="Thông tin" />
-                    <Tab label="Môn học" />
-                    <Tab label="Lịch dạy" />
-                  </Tabs>
-                  <Divider />
-                  <CardContent>
-                    {tabValue === 0 && (
-                      <Box>
-                        <Typography
-                          variant="h6"
-                          sx={{ mb: 2 }}
-                        >
-                          Thông tin chi tiết
-                        </Typography>
-                        <Typography
-                          variant="body1"
-                          sx={{ mb: 3 }}
-                        >
-                          {teacher.bio}
-                        </Typography>
-                        
-                        <Typography
-                          variant="h6"
-                          sx={{ mb: 2 }}
-                        >
-                          Bằng cấp và chuyên môn
-                        </Typography>
-                        <Stack
-                          alignItems="flex-start"
-                          direction="row"
-                          spacing={1}
-                          sx={{ mb: 2 }}
-                        >
-                          <GraduationCap fontSize="var(--icon-fontSize-md)" />
-                          <Typography variant="body1">
-                            {teacher.education}
-                          </Typography>
-                        </Stack>
-                      </Box>
-                    )}
-                    {tabValue === 1 && (
+                )}
+
+                {/* Tab 1: Môn học có thể dạy */}
+                {tabValue === 1 && (
+                  <Stack spacing={2}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Danh sách môn học</Typography>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => setAddSubjectDialogOpen(true)}
+                      >
+                        + Thêm môn
+                      </Button>
+                    </Stack>
+                    {teacherSubjects.length > 0 ? (
                       <List>
-                        {teacherSubjects.map(subject => (
-                          <ListItem key={subject.id} divider>
-                            <ListItemAvatar>
-                              <Avatar>
-                                <BookBookmark />
-                              </Avatar>
-                            </ListItemAvatar>
-                            <ListItemText
-                              primary={subject.name}
-                              secondary={
-                                <>
-                                  <Typography component="span" variant="body2" color="text.primary">
-                                    {subject.code}
-                                  </Typography>
-                                  {` — ${subject.description}`}
-                                </>
-                              }
-                            />
-                            <Chip
-                              label={
-                                subject.level === 'beginner' ? 'Cơ bản' :
-                                subject.level === 'intermediate' ? 'Trung cấp' :
-                                'Nâng cao'
-                              }
-                              color={
-                                subject.level === 'beginner' ? 'info' :
-                                subject.level === 'intermediate' ? 'warning' :
-                                'error'
-                              }
-                              size="small"
-                              sx={{ ml: 2 }}
-                            />
-                          </ListItem>
+                        {teacherSubjects.map((s, i) => (
+                          <Box key={s.id}>
+                            <ListItem sx={{ py: 3 }}>
+                              <ListItemAvatar>
+                                <Avatar sx={{ bgcolor: 'primary.lighter', color: 'primary.main' }}>
+                                  <BookBookmark />
+                                </Avatar>
+                              </ListItemAvatar>
+                              <ListItemText
+                                primary={s.name}
+                                secondary={`${s.code} — ${s.category}`}
+                              />
+                              <Chip
+                                label={s.level === 'beginner' ? 'Cơ bản' : s.level === 'intermediate' ? 'Trung cấp' : 'Nâng cao'}
+                                color={s.level === 'beginner' ? 'info' : s.level === 'intermediate' ? 'warning' : 'error'}
+                                size="small"
+                              />
+                            </ListItem>
+                            {i < teacherSubjects.length - 1 && <Divider />}
+                          </Box>
                         ))}
                       </List>
+                    ) : (
+                      <Typography color="text.secondary">Chưa được gán môn học nào</Typography>
                     )}
-                    {tabValue === 2 && (
-                      <Typography
-                        variant="body1"
-                      >
-                        Không có lịch dạy
-                      </Typography>
+                  </Stack>
+                )}
+
+                {/* Tab 2: Lịch dạy */}
+                {tabValue === 2 && (
+                  <>
+                    {Object.keys(schedulesByDay).length > 0 ? (
+                      <Stack spacing={3}>
+                        {Object.keys(schedulesByDay).map((day) => (
+                          <Box key={day}>
+                            <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, color: 'primary.main' }}>
+                              {day}
+                            </Typography>
+                            <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                              <Table size="small">
+                                <TableHead>
+                                  <TableRow sx={{ bgcolor: 'action.hover' }}>
+                                    <TableCell sx={{ fontWeight: 600 }}>Thời gian</TableCell>
+                                    <TableCell sx={{ fontWeight: 600 }}>Môn</TableCell>
+                                    <TableCell sx={{ fontWeight: 600 }}>Phòng</TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {schedulesByDay[day].map((sch: any, idx: number) => {
+                                    const sub = subjects.find(s => String(s.id) === String(sch.subjectId));
+                                    return (
+                                      <TableRow key={idx} hover sx={{ height: '72px' }}>
+                                        <TableCell>
+                                          <Typography variant="body2" fontWeight={500}>
+                                            {sch.startTime} - {sch.endTime}
+                                          </Typography>
+                                        </TableCell>
+                                        <TableCell>{sub?.name || 'N/A'}</TableCell>
+                                        <TableCell>
+                                          <Chip label={sch.room || 'N/A'} size="small" variant="outlined" />
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          </Box>
+                        ))}
+                      </Stack>
+                    ) : (
+                      <Typography color="text.secondary">Chưa có lịch dạy</Typography>
                     )}
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-          </div>
-        </Stack>
-      </Container>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </Box>
+        </Box>
+      </Stack>
+
+      <EditTeacherDialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        teacher={teacher}
+        onSuccess={refetch}
+      />
+
+      <AddSubjectToTeacherDialog
+        open={addSubjectDialogOpen}
+        onClose={() => setAddSubjectDialogOpen(false)}
+        teacherId={teacher?.id || ''}
+        availableSubjects={subjects}
+        currentSubjectIds={
+          Array.isArray(teacher?.subjects)
+            ? teacher.subjects.map((s: any) => typeof s === 'string' ? s : (s._id || s.id))
+            : []
+        }
+        onSuccess={refetch}
+      />
     </Box>
   );
 }

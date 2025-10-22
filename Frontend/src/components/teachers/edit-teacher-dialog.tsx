@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -12,27 +12,44 @@ import {
   Alert,
   CircularProgress
 } from '@mui/material';
+import { Teacher } from '@/types';
 import { teachersService } from '@/services/teachers.service';
 
-interface AddTeacherDialogProps {
+interface EditTeacherDialogProps {
   open: boolean;
   onClose: () => void;
+  teacher: Teacher | null;
   onSuccess: () => void;
 }
 
-export function AddTeacherDialog({ open, onClose, onSuccess }: AddTeacherDialogProps) {
+export function EditTeacherDialog({ open, onClose, teacher, onSuccess }: EditTeacherDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    education: '',
-    bio: ''
+    name: teacher?.name || '',
+    email: teacher?.email || '',
+    phone: teacher?.phone || '',
+    address: teacher?.address || '',
+    education: teacher?.education || '',
+    bio: teacher?.bio || ''
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Update form data when teacher changes
+  useEffect(() => {
+    if (teacher) {
+      setFormData({
+        name: teacher.name || '',
+        email: teacher.email || '',
+        phone: teacher.phone || '',
+        address: teacher.address || '',
+        education: teacher.education || '',
+        bio: teacher.bio || ''
+      });
+      setError(null);
+    }
+  }, [teacher]);
+
+  const handleChange = (e: any) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -42,40 +59,29 @@ export function AddTeacherDialog({ open, onClose, onSuccess }: AddTeacherDialogP
 
   const handleSubmit = async () => {
     if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim()) {
-      setError('Vui lòng nhập tên, email và số điện thoại');
+      setError('Vui lòng nhập tên, email và điện thoại');
       return;
     }
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      setError('Email không hợp lệ');
-      return;
-    }
-
+    if (!teacher) return;
     setLoading(true);
     setError(null);
 
     try {
-      const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
-      await teachersService.create({
+      const response = await teachersService.update(teacher.id, {
         name: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
-        address: formData.address.trim() || 'Not specified',
-        education: formData.education.trim() || 'Not specified',
-        bio: formData.bio.trim(),
-        joinDate: today,
-        subjects: []
+        address: formData.address.trim(),
+        education: formData.education.trim(),
+        bio: formData.bio.trim()
       });
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        address: '',
-        education: '',
-        bio: ''
-      });
+
+      if (!response.success) {
+        setError(response.error || 'Có lỗi xảy ra khi cập nhật');
+        return;
+      }
+
       onSuccess();
       onClose();
     } catch (err) {
@@ -87,14 +93,6 @@ export function AddTeacherDialog({ open, onClose, onSuccess }: AddTeacherDialogP
 
   const handleClose = () => {
     if (!loading) {
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        address: '',
-        education: '',
-        bio: ''
-      });
       setError(null);
       onClose();
     }
@@ -102,19 +100,18 @@ export function AddTeacherDialog({ open, onClose, onSuccess }: AddTeacherDialogP
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Thêm giáo viên mới</DialogTitle>
+      <DialogTitle>Chỉnh sửa giáo viên</DialogTitle>
       <DialogContent sx={{ pt: 2 }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <Stack spacing={2}>
           <TextField
             fullWidth
-            label="Tên giáo viên"
+            label="Tên"
             name="name"
             value={formData.name}
             onChange={handleChange}
             disabled={loading}
             required
-            placeholder="Nhập tên giáo viên"
           />
           <TextField
             fullWidth
@@ -125,17 +122,15 @@ export function AddTeacherDialog({ open, onClose, onSuccess }: AddTeacherDialogP
             onChange={handleChange}
             disabled={loading}
             required
-            placeholder="example@email.com"
           />
           <TextField
             fullWidth
-            label="Số điện thoại"
+            label="Điện thoại"
             name="phone"
             value={formData.phone}
             onChange={handleChange}
             disabled={loading}
             required
-            placeholder="0901234567"
           />
           <TextField
             fullWidth
@@ -144,7 +139,6 @@ export function AddTeacherDialog({ open, onClose, onSuccess }: AddTeacherDialogP
             value={formData.address}
             onChange={handleChange}
             disabled={loading}
-            placeholder="Thành phố, Quốc gia"
           />
           <TextField
             fullWidth
@@ -153,7 +147,6 @@ export function AddTeacherDialog({ open, onClose, onSuccess }: AddTeacherDialogP
             value={formData.education}
             onChange={handleChange}
             disabled={loading}
-            placeholder="VD: Thạc sĩ Công nghệ Thông tin"
           />
           <TextField
             fullWidth
@@ -164,18 +157,17 @@ export function AddTeacherDialog({ open, onClose, onSuccess }: AddTeacherDialogP
             disabled={loading}
             multiline
             rows={3}
-            placeholder="Mô tả về giáo viên"
           />
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose} disabled={loading}>Hủy</Button>
-        <Button 
-          onClick={handleSubmit} 
-          variant="contained" 
+        <Button
+          onClick={handleSubmit}
+          variant="contained"
           disabled={loading}
         >
-          {loading ? <CircularProgress size={24} /> : 'Thêm'}
+          {loading ? <CircularProgress size={24} /> : 'Lưu'}
         </Button>
       </DialogActions>
     </Dialog>

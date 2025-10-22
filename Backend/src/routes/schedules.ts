@@ -17,7 +17,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     const skip = (pageNum - 1) * limitNum;
     const [schedules, total] = await Promise.all([
-      Schedule.find(query).skip(skip).limit(limitNum).populate('teacherId subjectId').lean(),
+      Schedule.find(query).skip(skip).limit(limitNum).select('teacherId subjectId dayOfWeek startTime endTime room status createdAt updatedAt'),
       Schedule.countDocuments(query),
     ]);
 
@@ -31,9 +31,19 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
+  try {
+    const { teacherId } = req.params;
+    const schedules = await Schedule.find({ teacherId }).select('teacherId subjectId dayOfWeek startTime endTime room status createdAt updatedAt');
+    res.json({ success: true, data: schedules });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const schedule = await Schedule.findById(req.params.id).populate('teacherId subjectId').lean();
+    const schedule = await Schedule.findById(req.params.id).select('teacherId subjectId dayOfWeek startTime endTime room status createdAt updatedAt');
     if (!schedule) {
       return res.status(404).json({ success: false, error: 'Không tìm thấy lịch học' });
     }

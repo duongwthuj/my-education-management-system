@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { Teacher } from '../models';
+import { Teacher, Subject } from '../models';
 import { ApiResponse } from '../types';
 
 const router = Router();
@@ -104,6 +104,35 @@ router.post('/', async (req: Request, res: Response) => {
 // PUT /api/teachers/:id - Cập nhật giáo viên
 router.put('/:id', async (req: Request, res: Response) => {
   try {
+    // Nếu cập nhật danh sách môn học, cần đồng bộ với Subject.teachers
+    if (req.body.subjects && Array.isArray(req.body.subjects)) {
+      // Lấy thông tin giáo viên cũ để so sánh môn học
+      const oldTeacher = await Teacher.findById(req.params.id).lean();
+      const oldSubjectIds = oldTeacher?.subjects || [];
+      const newSubjectIds = req.body.subjects;
+
+      // Tìm môn mới được thêm vào
+      const addedSubjectIds = newSubjectIds.filter((id: string) => !oldSubjectIds.includes(id));
+      // Tìm môn bị xóa
+      const removedSubjectIds = oldSubjectIds.filter((id: string) => !newSubjectIds.includes(id));
+
+      // Cập nhật môn được thêm: thêm teacherId vào Subject.teachers
+      if (addedSubjectIds.length > 0) {
+        await Subject.updateMany(
+          { _id: { $in: addedSubjectIds } },
+          { $addToSet: { teachers: req.params.id } }
+        );
+      }
+
+      // Cập nhật môn bị xóa: xóa teacherId khỏi Subject.teachers
+      if (removedSubjectIds.length > 0) {
+        await Subject.updateMany(
+          { _id: { $in: removedSubjectIds } },
+          { $pull: { teachers: req.params.id } }
+        );
+      }
+    }
+
     const teacher = await Teacher.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true,

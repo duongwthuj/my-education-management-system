@@ -13,15 +13,39 @@ export function useSchedules() {
     setLoading(true);
     setError(null);
     
-    const response = await schedulesService.getAll();
-    
-    if (response.success && response.data) {
-      setSchedules(response.data);
-    } else {
-      setError(response.error || 'Failed to fetch schedules');
+    try {
+      const response = await schedulesService.getAll();
+      
+      if (response.success && response.data) {
+        // Map data and normalize teacherId
+        const schedules = response.data.map((schedule: any) => {
+          // Handle populated teacher/subject objects
+          const teacherId = typeof schedule.teacherId === 'object' 
+            ? schedule.teacherId._id 
+            : schedule.teacherId;
+          const subjectId = typeof schedule.subjectId === 'object' 
+            ? schedule.subjectId._id 
+            : schedule.subjectId;
+          
+          return {
+            ...schedule,
+            id: schedule._id || schedule.id,
+            teacherId,
+            subjectId
+          };
+        });
+        setSchedules(schedules);
+        console.log('✅ Schedules loaded:', schedules.length, schedules);
+      } else {
+        setError(response.error || 'Failed to fetch schedules');
+        console.error('❌ Error:', response.error);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch schedules');
+      console.error('❌ Exception:', err);
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   }, []);
 
   useEffect(() => {

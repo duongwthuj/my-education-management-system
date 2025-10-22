@@ -13,11 +13,6 @@ import {
   alpha,
   useMediaQuery,
   Card,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  SelectChangeEvent,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -75,29 +70,18 @@ export function TeacherScheduleCalendar({ scheduleData }: TeacherScheduleCalenda
   
   // Thiết lập giáo viên mặc định nếu chưa chọn
   useEffect(() => {
-    if (!selectedTeacher && teacherList.length > 0 && !viewAllTeachers) {
+    // If showing all teachers (multiple teachers in data), set viewAllTeachers = true
+    if (teacherList.length > 1) {
+      setViewAllTeachers(true);
+      setSelectedTeacher(null);
+    } else if (teacherList.length === 1) {
+      setViewAllTeachers(false);
       setSelectedTeacher(teacherList[0]);
     }
-  }, [teacherList, selectedTeacher, viewAllTeachers]);
+  }, [teacherList]);
   
   // Lấy ngày hiện tại
   const currentDate = new Date();
-  
-  // Xử lý thay đổi giáo viên
-  const handleTeacherChange = (event: any) => {
-    setLoading(true);
-    const value = event.target.value;
-    
-    if (value === 'all') {
-      setSelectedTeacher(null);
-      setViewAllTeachers(true);
-    } else {
-      setSelectedTeacher(value);
-      setViewAllTeachers(false);
-    }
-    
-    setTimeout(() => setLoading(false), 300);
-  };
   
   // Xử lý đóng/mở accordion
   const handleAccordionChange = (dayDate: string) => (_: React.SyntheticEvent, isExpanded: boolean) => {
@@ -704,30 +688,7 @@ export function TeacherScheduleCalendar({ scheduleData }: TeacherScheduleCalenda
 
   return (
     <Box>
-      {/* Điều khiển lịch */}
-      <Card sx={{ mb: 3, p: 2 }}>
-        <Stack spacing={2}>
-          <FormControl fullWidth>
-            <InputLabel id="teacher-select-label">Giáo viên</InputLabel>
-            <Select
-              labelId="teacher-select-label"
-              value={viewAllTeachers ? 'all' : (selectedTeacher || '')}
-              onChange={handleTeacherChange}
-              label="Giáo viên"
-              disabled={loading}
-            >
-              <MenuItem value="all">
-                <em>Tất cả giáo viên</em>
-              </MenuItem>
-              {teacherList.map(teacher => (
-                <MenuItem key={teacher} value={teacher}>
-                  {teacher}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Stack>
-      </Card>
+      {/* Hiển thị lịch */}
 
       {/* Hiển thị thống kê */}
       {renderStats()}

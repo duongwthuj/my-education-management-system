@@ -32,6 +32,7 @@ interface ClassCardProps {
   classItem: Class;
   subjectName?: string;
   teacher?: { name: string; avatar?: string } | null;
+  onDeleteClick?: (classItem: Class) => void;
 }
 
 const statusMap = {
@@ -40,7 +41,7 @@ const statusMap = {
   'completed': { color: 'info', text: 'Đã hoàn thành' }
 };
 
-export const ClassCard = memo(function ClassCard({ classItem, subjectName, teacher }: ClassCardProps) {
+export const ClassCard = memo(function ClassCard({ classItem, subjectName, teacher, onDeleteClick }: ClassCardProps) {
   
   // Tính thời gian đã qua (progress)
   const startDate = new Date(classItem.startDate);
@@ -177,7 +178,7 @@ export const ClassCard = memo(function ClassCard({ classItem, subjectName, teach
           </IconButton>
         </Tooltip>
         <Tooltip title="Xóa">
-          <IconButton>
+          <IconButton onClick={() => onDeleteClick?.(classItem)}>
             <Trash fontSize="var(--icon-fontSize-md)" />
           </IconButton>
         </Tooltip>

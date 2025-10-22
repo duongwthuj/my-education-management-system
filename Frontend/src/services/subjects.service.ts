@@ -4,12 +4,16 @@ import type { Subject } from '@/types/subject';
 export interface CreateSubjectDTO {
   name: string;
   code: string;
+  category: string;
+  level: 'beginner' | 'intermediate' | 'advanced';
   description?: string;
 }
 
 export interface UpdateSubjectDTO {
   name?: string;
   code?: string;
+  category?: string;
+  level?: 'beginner' | 'intermediate' | 'advanced';
   description?: string;
 }
 
