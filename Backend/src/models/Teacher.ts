@@ -71,7 +71,6 @@ const teacherSchema = new Schema<ITeacherDocument>(
 );
 
 // Indexes
-teacherSchema.index({ email: 1 });
 teacherSchema.index({ status: 1 });
 teacherSchema.index({ name: 'text' });
 

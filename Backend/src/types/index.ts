@@ -35,7 +35,7 @@ export interface IClass {
   location: string;
 }
 
-// Schedule
+// Schedule (Legacy - kept for compatibility)
 export interface ISchedule {
   teacherId: string;
   subjectId: string;
@@ -44,6 +44,49 @@ export interface ISchedule {
   endTime: string;
   room: string;
   status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
+}
+
+// Work Schedule - Shift Registration
+export interface IWorkSchedule {
+  teacherId: string;
+  dayOfWeek: string;
+  shift: 'Sáng' | 'Chiều' | 'Tối';
+  startTime: string;
+  endTime: string;
+  duration: number;
+  status: 'scheduled' | 'active' | 'completed' | 'cancelled';
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Teaching Schedule - Teaching Assignment
+export interface ITeachingSchedule {
+  workScheduleId: string;
+  teacherId: string;
+  subjectId: string;
+  classId: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  room: string;
+  status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Free Schedule - Break Time
+export interface IFreeSchedule {
+  workScheduleId: string;
+  teacherId: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  reason: 'break' | 'lunch' | 'other';
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // API Response

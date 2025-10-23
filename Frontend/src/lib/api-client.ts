@@ -85,7 +85,8 @@ class ApiClient {
         data: data.data ? transformResponse<T>(data.data) : undefined,
       };
 
-      console.log(`✅ API Success: ${url}`, transformedResponse);
+      console.log(`✅ API Success: ${url}`);
+      console.log('📦 Transformed Response:', transformedResponse);
       return transformedResponse;
     } catch (error) {
       console.error('❌ API Request Exception:', error);

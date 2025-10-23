@@ -13,8 +13,8 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Middleware
 app.use(cors({
-  origin: FRONTEND_URL,
-  credentials: true,
+  origin: '*',  // Tạm cho phép tất cả (chỉ dùng test)
+  credentials: false,
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

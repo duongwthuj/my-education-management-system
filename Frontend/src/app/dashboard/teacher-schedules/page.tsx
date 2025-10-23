@@ -14,17 +14,23 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
-  Divider
+  Divider,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import { TeacherScheduleCalendar } from '@/components/schedules/teacher-schedule-calendar';
 import { useSchedules } from '@/hooks/use-schedules';
 import { useTeachers } from '@/hooks/use-teachers';
+import { WorkSchedulesList } from '@/components/schedules/work-schedules-list';
+import { TeachingSchedulesList } from '@/components/schedules/teaching-schedules-list';
+import { FreeSchedulesList } from '@/components/schedules/free-schedules-list';
 import { TeacherSchedule } from '@/types';
 
 export default function TeacherSchedulePage() {
   const { schedules, loading: schedulesLoading, error: schedulesError } = useSchedules();
   const { teachers, loading: teachersLoading, error: teachersError } = useTeachers();
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
+  const [tabValue, setTabValue] = useState(0);
 
   // Debug logging
   useMemo(() => {
@@ -146,6 +152,31 @@ export default function TeacherSchedulePage() {
     setSelectedTeacherId(event.target.value);
   };
 
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  interface TabPanelProps {
+    children?: React.ReactNode;
+    index: number;
+    value: number;
+  }
+
+  function TabPanel(props: TabPanelProps) {
+    const { children, value, index, ...other } = props;
+    return (
+      <div
+        role="tabpanel"
+        hidden={value !== index}
+        id={`schedule-tabpanel-${index}`}
+        aria-labelledby={`schedule-tab-${index}`}
+        {...other}
+      >
+        {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
+      </div>
+    );
+  }
+
   return (
     <>
       <Box
@@ -189,35 +220,72 @@ export default function TeacherSchedulePage() {
                   </Box>
                 ) : (
                   <>
-                    {/* Teacher Selection - Single Dropdown */}
-                    <FormControl sx={{ mb: 3, minWidth: 300 }}>
-                      <InputLabel>Chọn giáo viên</InputLabel>
-                      <Select
-                        value={selectedTeacherId}
-                        onChange={handleTeacherChange}
-                        label="Chọn giáo viên"
+                    {/* Tabs for different schedule views */}
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                      <Tabs
+                        value={tabValue}
+                        onChange={handleTabChange}
+                        aria-label="schedule tabs"
+                        sx={{
+                          '& .MuiTab-root': {
+                            minHeight: 48,
+                            fontSize: '0.95rem',
+                            fontWeight: 500,
+                          },
+                        }}
                       >
-                        <MenuItem value="all">
-                          <strong>📋 Tất cả giáo viên</strong>
-                        </MenuItem>
-                        {teachers.map((teacher) => (
-                          <MenuItem key={teacher.id} value={teacher.id}>
-                            {teacher.name}
+                        <Tab label="📅 Lịch Cũ" id="schedule-tab-0" />
+                        <Tab label="🕐 Ca Làm Việc" id="schedule-tab-1" />
+                        <Tab label="📖 Lịch Giảng Dạy" id="schedule-tab-2" />
+                        <Tab label="☕ Lịch Rảnh" id="schedule-tab-3" />
+                      </Tabs>
+                    </Box>
+
+                    {/* Tab 0: Old Schedule Calendar */}
+                    <TabPanel value={tabValue} index={0}>
+                      <FormControl sx={{ mb: 3, minWidth: 300 }}>
+                        <InputLabel>Chọn giáo viên</InputLabel>
+                        <Select
+                          value={selectedTeacherId}
+                          onChange={handleTeacherChange}
+                          label="Chọn giáo viên"
+                        >
+                          <MenuItem value="all">
+                            <strong>📋 Tất cả giáo viên</strong>
                           </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                          {teachers.map((teacher) => (
+                            <MenuItem key={teacher.id} value={teacher.id}>
+                              {teacher.name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
 
-                    <Divider sx={{ my: 2 }} />
+                      <Divider sx={{ my: 2 }} />
 
-                    {/* Display schedules */}
-                    {Object.keys(filteredData).length > 0 ? (
-                      <TeacherScheduleCalendar scheduleData={filteredData} />
-                    ) : (
-                      <Alert severity="info">
-                        Không có lịch làm việc nào
-                      </Alert>
-                    )}
+                      {Object.keys(filteredData).length > 0 ? (
+                        <TeacherScheduleCalendar scheduleData={filteredData} />
+                      ) : (
+                        <Alert severity="info">
+                          Không có lịch làm việc nào
+                        </Alert>
+                      )}
+                    </TabPanel>
+
+                    {/* Tab 1: Work Schedules */}
+                    <TabPanel value={tabValue} index={1}>
+                      <WorkSchedulesList />
+                    </TabPanel>
+
+                    {/* Tab 2: Teaching Schedules */}
+                    <TabPanel value={tabValue} index={2}>
+                      <TeachingSchedulesList />
+                    </TabPanel>
+
+                    {/* Tab 3: Free Schedules */}
+                    <TabPanel value={tabValue} index={3}>
+                      <FreeSchedulesList />
+                    </TabPanel>
                   </>
                 )}
               </Box>

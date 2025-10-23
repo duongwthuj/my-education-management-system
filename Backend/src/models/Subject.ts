@@ -49,7 +49,6 @@ const subjectSchema = new Schema<ISubjectDocument>(
 );
 
 // Indexes
-subjectSchema.index({ code: 1 });
 subjectSchema.index({ category: 1 });
 subjectSchema.index({ level: 1 });
 subjectSchema.index({ name: 'text', description: 'text' });
