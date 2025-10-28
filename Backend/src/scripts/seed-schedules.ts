@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import connectDB from '../config/database';
-import { WorkSchedule, TeachingSchedule, FreeSchedule, Teacher, Subject } from '../models';
+import { WorkSchedule, TeachingSchedule, FreeSchedule, Teacher, Subject, Teach, Class } from '../models';
 
 dotenv.config();
 
@@ -17,6 +17,7 @@ const seedSchedules = async () => {
       WorkSchedule.deleteMany({}),
       TeachingSchedule.deleteMany({}),
       FreeSchedule.deleteMany({}),
+      Teach.deleteMany({}),
     ]);
     console.log('✅ Existing schedule data cleared\n');
 
@@ -32,9 +33,12 @@ const seedSchedules = async () => {
 
     console.log(`📚 Found ${teachers.length} teachers and ${subjects.length} subjects\n`);
 
+    // Fetch existing classes for session type teaches
+    const classes = await Class.find().limit(10);
+
     // Seed Work Schedules
     console.log('⏰ Seeding work schedules...');
-    const workSchedulesData = [];
+    const workSchedulesData: any[] = [];
     const daysOfWeek = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6'];
     const shifts = ['Sáng', 'Chiều', 'Tối'];
 
@@ -62,15 +66,69 @@ const seedSchedules = async () => {
     const workSchedules = await WorkSchedule.insertMany(workSchedulesData);
     console.log(`✅ ${workSchedules.length} work schedules created\n`);
 
-    // Seed Teaching Schedules
+    // Seed Teaches (Fixed and Session Class Assignments)
+    console.log('📚 Seeding teaches (class assignments)...');
+    const teachesData: any[] = [];
+    const daysOfWeekForTeaches = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    const fixedClassNames = ['Lớp 10A', 'Lớp 10B', 'Lớp 11A', 'Lớp 11B', 'Lớp 12A', 'Lớp 12B'];
+
+    teachers.forEach((teacher, tIndex) => {
+      // Create 2-3 fixed class assignments per teacher
+      const numFixedClasses = Math.floor(Math.random() * 2) + 2;
+      for (let i = 0; i < numFixedClasses; i++) {
+        const subject = subjects[Math.floor(Math.random() * subjects.length)];
+        const day = daysOfWeekForTeaches[Math.floor(Math.random() * daysOfWeekForTeaches.length)];
+        const startHour = 8 + Math.floor(Math.random() * 8);
+        const startTime = `${String(startHour).padStart(2, '0')}:00`;
+        const endTime = `${String(startHour + 2).padStart(2, '0')}:00`;
+
+        teachesData.push({
+          teacherId: teacher._id,
+          subjectId: subject._id,
+          className: fixedClassNames[Math.floor(Math.random() * fixedClassNames.length)],
+          classType: 'fixed',
+          dayOfWeek: day,
+          startTime,
+          endTime,
+          notes: `Giảng dạy ${subject.name} cho lớp cố định`,
+        });
+      }
+
+      // Create 1-2 session class assignments per teacher
+      if (classes.length > 0) {
+        const numSessionClasses = Math.floor(Math.random() * 2) + 1;
+        for (let i = 0; i < numSessionClasses; i++) {
+          const subject = subjects[Math.floor(Math.random() * subjects.length)];
+          const sessionClass = classes[Math.floor(Math.random() * classes.length)];
+          const day = daysOfWeekForTeaches[Math.floor(Math.random() * daysOfWeekForTeaches.length)];
+          const startHour = 8 + Math.floor(Math.random() * 8);
+          const startTime = `${String(startHour).padStart(2, '0')}:00`;
+          const endTime = `${String(startHour + 1).padStart(2, '0')}:00`;
+
+          teachesData.push({
+            teacherId: teacher._id,
+            subjectId: subject._id,
+            sessionClassId: sessionClass._id,
+            classType: 'session',
+            dayOfWeek: day,
+            startTime,
+            endTime,
+            notes: `Giảng dạy ${subject.name} cho lớp ngoài khóa`,
+          });
+        }
+      }
+    });
+
+    const teaches = await Teach.insertMany(teachesData);
+    console.log(`✅ ${teaches.length} teaches created\n`);
     console.log('📖 Seeding teaching schedules...');
-    const teachingSchedulesData = [];
+    const teachingSchedulesData: any[] = [];
 
     workSchedules.forEach((ws, wsIndex) => {
       // Each work schedule gets 1-2 teaching assignments
       const numAssignments = Math.floor(Math.random() * 2) + 1;
       for (let i = 0; i < numAssignments; i++) {
-        const teacher = teachers.find((t) => t._id.equals(ws.teacherId));
+        const teacher = teachers.find((t: any) => t._id.equals(ws.teacherId));
         const subject = subjects[Math.floor(Math.random() * subjects.length)];
 
         const startHour = parseInt(ws.startTime.split(':')[0]);
@@ -97,7 +155,7 @@ const seedSchedules = async () => {
 
     // Seed Free Schedules
     console.log('☕ Seeding free schedules...');
-    const freeSchedulesData = [];
+    const freeSchedulesData: any[] = [];
     const reasons = ['break', 'lunch', 'other'];
 
     workSchedules.forEach((ws) => {
@@ -126,6 +184,7 @@ const seedSchedules = async () => {
     console.log('✅ Schedules seeding completed successfully!\n');
     console.log('📊 Summary:');
     console.log(`   - Work Schedules: ${workSchedules.length}`);
+    console.log(`   - Teaches: ${teaches.length}`);
     console.log(`   - Teaching Schedules: ${teachingSchedules.length}`);
     console.log(`   - Free Schedules: ${freeSchedules.length}\n`);
 

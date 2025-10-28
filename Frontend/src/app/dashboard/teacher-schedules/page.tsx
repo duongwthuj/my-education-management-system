@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useRef } from 'react';
 import {
   Box,
   Container,
@@ -9,148 +9,30 @@ import {
   Card,
   CircularProgress,
   Alert,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  SelectChangeEvent,
-  Divider,
   Tabs,
   Tab,
+  Button,
 } from '@mui/material';
-import { TeacherScheduleCalendar } from '@/components/schedules/teacher-schedule-calendar';
-import { useSchedules } from '@/hooks/use-schedules';
+import { Upload, Sparkle } from '@phosphor-icons/react';
+import { useTeaches } from '@/hooks/useTeaches';
 import { useTeachers } from '@/hooks/use-teachers';
 import { WorkSchedulesList } from '@/components/schedules/work-schedules-list';
-import { TeachingSchedulesList } from '@/components/schedules/teaching-schedules-list';
+import { TeachesList } from '@/components/schedules/teaches-list';
 import { FreeSchedulesList } from '@/components/schedules/free-schedules-list';
-import { TeacherSchedule } from '@/types';
+import { ImportScheduleDialog } from '@/components/schedules/import-schedule-dialog';
+import { GenerateSchedulesDialog } from '@/components/schedules/generate-schedules-dialog';
 
 export default function TeacherSchedulePage() {
-  const { schedules, loading: schedulesLoading, error: schedulesError } = useSchedules();
+  const { teaches, loading: teachesLoading, error: teachesError, fetchAll: fetchAllTeaches } = useTeaches();
   const { teachers, loading: teachersLoading, error: teachersError } = useTeachers();
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
   const [tabValue, setTabValue] = useState(0);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
+  const freeSchedulesListRef = useRef<{ refetch: () => Promise<void> }>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Debug logging
-  useMemo(() => {
-    console.log('👨‍🏫 Teachers loaded:', teachers.length);
-    teachers.forEach(t => console.log(`  - ${t.name}: ${t.id}`));
-    console.log('📅 Schedules loaded:', schedules.length);
-  }, [teachers, schedules]);
-
-  const teacherScheduleData = useMemo(() => {
-    if (!schedules.length || !teachers.length) {
-      return {};
-    }
-
-    const teacherMap = new Map(teachers.map(t => [String(t.id), t]));
-    const data: TeacherSchedule = {};
-
-    let matchCount = 0;
-    schedules.forEach((schedule) => {
-      // Ensure teacherId is string
-      const scheduleTeacherId = String(schedule.teacherId);
-      const teacher = teacherMap.get(scheduleTeacherId);
-      if (!teacher) return;
-      
-      matchCount++;
-      const teacherName = teacher.name;
-      if (!data[teacherName]) {
-        data[teacherName] = [];
-      }
-
-      // Parse time slots
-      const startTimeParts = schedule.startTime.split(':');
-      const endTimeParts = schedule.endTime.split(':');
-      const startHours = parseInt(startTimeParts[0], 10);
-      const endHours = parseInt(endTimeParts[0], 10);
-
-      // Determine period
-      let period: 'morning' | 'afternoon' | 'evening' = 'morning';
-      if (startHours >= 17) period = 'evening';
-      else if (startHours >= 13) period = 'afternoon';
-
-      // Create a unique date key from dayOfWeek
-      const today = new Date();
-      const dayMap: { [key: string]: number } = {
-        'Chủ Nhật': 0,
-        'Thứ 2': 1,
-        'Thứ Ba': 2,
-        'Thứ Tư': 3,
-        'Thứ Năm': 4,
-        'Thứ 6': 5,
-        'Thứ Bảy': 6
-      };
-      
-      const targetDay = dayMap[schedule.dayOfWeek] ?? 1;
-      const currentDay = today.getDay();
-      const diff = targetDay - currentDay;
-      const date = new Date(today);
-      date.setDate(date.getDate() + diff);
-      const dateStr = date.toISOString().split('T')[0];
-
-      // Find or create day entry
-      let dayEntry = data[teacherName].find(d => d.date === dateStr);
-      if (!dayEntry) {
-        dayEntry = {
-          date: dateStr,
-          weekday: schedule.dayOfWeek,
-          slots: []
-        };
-        data[teacherName].push(dayEntry);
-      }
-
-      dayEntry.slots.push({
-        time: `${schedule.startTime} - ${schedule.endTime}`,
-        status: 'available',
-        period
-      });
-    });
-
-    // Sort days by date and slots by time
-    Object.values(data).forEach(days => {
-      days.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      days.forEach(day => {
-        day.slots.sort((a, b) => a.time.localeCompare(b.time));
-      });
-    });
-
-    console.log(`✅ Matched ${matchCount} schedules to teachers. Result:`, Object.keys(data));
-    return data;
-  }, [schedules, teachers]);
-
-  // Get filtered data for selected teacher (or all teachers if "all" is selected)
-  const filteredData = useMemo(() => {
-    if (!teachers.length) return {};
-    
-    // If "all" is selected or no selection, show all teachers
-    if (!selectedTeacherId || selectedTeacherId === 'all') {
-      return teacherScheduleData;
-    }
-    
-    // Otherwise show only selected teacher
-    const teacher = teachers.find(t => t.id === selectedTeacherId);
-    if (!teacher) return {};
-
-    return {
-      [teacher.name]: teacherScheduleData[teacher.name] || []
-    };
-  }, [selectedTeacherId, teachers, teacherScheduleData]);
-
-  const loading = schedulesLoading || teachersLoading;
-  const error = schedulesError || teachersError;
-
-  // Set default to show all teachers on first load
-  useMemo(() => {
-    if (!selectedTeacherId && teachers.length > 0) {
-      setSelectedTeacherId('all');
-    }
-  }, [teachers, selectedTeacherId]);
-
-  const handleTeacherChange = (event: SelectChangeEvent<string>) => {
-    setSelectedTeacherId(event.target.value);
-  };
+  const loading = teachesLoading || teachersLoading;
+  const error = teachesError || teachersError;
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -177,6 +59,20 @@ export default function TeacherSchedulePage() {
     );
   }
 
+  const handleGenerateSuccess = async () => {
+    console.log('✅ Generate success! Triggering refresh...');
+    fetchAllTeaches();
+    // Trigger full refresh
+    setRefreshTrigger(prev => prev + 1);
+    // Also try manual refetch
+    setTimeout(() => {
+      if (freeSchedulesListRef.current?.refetch) {
+        console.log('🔄 Calling refetch on FreeSchedulesList...');
+        freeSchedulesListRef.current.refetch().catch(err => console.error('Refetch error:', err));
+      }
+    }, 500);
+  };
+
   return (
     <>
       <Box
@@ -201,8 +97,25 @@ export default function TeacherSchedulePage() {
                   color="text.secondary"
                   variant="subtitle2"
                 >
-                  Xem lịch làm việc của từng giáo viên
+                  Quản lý lịch làm việc, phân công dạy và lịch rảnh
                 </Typography>
+              </Stack>
+              
+              <Stack direction="row" spacing={2}>
+                <Button
+                  variant="outlined"
+                  startIcon={<Upload />}
+                  onClick={() => setImportDialogOpen(true)}
+                >
+                  Import JSON
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<Sparkle weight="fill" />}
+                  onClick={() => setGenerateDialogOpen(true)}
+                >
+                  Tạo lịch dạy & lịch trống
+                </Button>
               </Stack>
             </Stack>
 
@@ -220,7 +133,6 @@ export default function TeacherSchedulePage() {
                   </Box>
                 ) : (
                   <>
-                    {/* Tabs for different schedule views */}
                     <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
                       <Tabs
                         value={tabValue}
@@ -234,57 +146,22 @@ export default function TeacherSchedulePage() {
                           },
                         }}
                       >
-                        <Tab label="📅 Lịch Cũ" id="schedule-tab-0" />
-                        <Tab label="🕐 Ca Làm Việc" id="schedule-tab-1" />
-                        <Tab label="📖 Lịch Giảng Dạy" id="schedule-tab-2" />
-                        <Tab label="☕ Lịch Rảnh" id="schedule-tab-3" />
+                        <Tab label="🕐 Ca Làm Việc" id="schedule-tab-0" />
+                        <Tab label="📚 Phân Công Dạy" id="schedule-tab-1" />
+                        <Tab label="☕ Lịch Rảnh" id="schedule-tab-2" />
                       </Tabs>
                     </Box>
 
-                    {/* Tab 0: Old Schedule Calendar */}
                     <TabPanel value={tabValue} index={0}>
-                      <FormControl sx={{ mb: 3, minWidth: 300 }}>
-                        <InputLabel>Chọn giáo viên</InputLabel>
-                        <Select
-                          value={selectedTeacherId}
-                          onChange={handleTeacherChange}
-                          label="Chọn giáo viên"
-                        >
-                          <MenuItem value="all">
-                            <strong>📋 Tất cả giáo viên</strong>
-                          </MenuItem>
-                          {teachers.map((teacher) => (
-                            <MenuItem key={teacher.id} value={teacher.id}>
-                              {teacher.name}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-
-                      <Divider sx={{ my: 2 }} />
-
-                      {Object.keys(filteredData).length > 0 ? (
-                        <TeacherScheduleCalendar scheduleData={filteredData} />
-                      ) : (
-                        <Alert severity="info">
-                          Không có lịch làm việc nào
-                        </Alert>
-                      )}
-                    </TabPanel>
-
-                    {/* Tab 1: Work Schedules */}
-                    <TabPanel value={tabValue} index={1}>
                       <WorkSchedulesList />
                     </TabPanel>
 
-                    {/* Tab 2: Teaching Schedules */}
-                    <TabPanel value={tabValue} index={2}>
-                      <TeachingSchedulesList />
+                    <TabPanel value={tabValue} index={1}>
+                      <TeachesList />
                     </TabPanel>
 
-                    {/* Tab 3: Free Schedules */}
-                    <TabPanel value={tabValue} index={3}>
-                      <FreeSchedulesList />
+                    <TabPanel value={tabValue} index={2}>
+                      <FreeSchedulesList ref={freeSchedulesListRef} key={refreshTrigger} />
                     </TabPanel>
                   </>
                 )}
@@ -293,6 +170,20 @@ export default function TeacherSchedulePage() {
           </Stack>
         </Container>
       </Box>
+      
+      <ImportScheduleDialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        onSuccess={() => {
+          fetchAllTeaches();
+        }}
+      />
+      
+      <GenerateSchedulesDialog
+        open={generateDialogOpen}
+        onClose={() => setGenerateDialogOpen(false)}
+        onSuccess={handleGenerateSuccess}
+      />
     </>
   );
 }

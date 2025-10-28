@@ -55,6 +55,29 @@ const teacherSchema = new Schema<ITeacherDocument>(
         ref: 'Subject',
       },
     ],
+    fixedClasses: [
+      {
+        classId: {
+          type: Schema.Types.ObjectId,
+          ref: 'Class',
+        },
+        subjectId: {
+          type: Schema.Types.ObjectId,
+          ref: 'Subject',
+        },
+        dayOfWeek: {
+          type: String,
+          enum: ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'],
+        },
+        shift: {
+          type: String,
+          enum: ['Sáng', 'Chiều', 'Tối'],
+        },
+        startTime: String,
+        endTime: String,
+        room: String,
+      },
+    ],
   },
   {
     timestamps: true,

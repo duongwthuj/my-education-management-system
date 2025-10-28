@@ -14,6 +14,7 @@ import {
   DialogContent,
   DialogActions,
   InputAdornment,
+  Pagination,
   Stack,
   SvgIcon,
   Tab,
@@ -37,45 +38,53 @@ export function SubjectsList() {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const { subjects, loading, error, refetch } = useSubjects();
+  const [allCategories, setAllCategories] = useState<string[]>(['all']);
+  const { subjects, loading, error, pagination, refetch, onPageChange } = useSubjects();
 
-  // Refetch subjects khi component mount để lấy dữ liệu mới nhất
+  // Tạo filters object từ state
+  const currentFilters = useMemo(() => {
+    const filters: { category?: string; level?: string; search?: string } = {};
+    if (selectedCategory !== 'all') filters.category = selectedCategory;
+    if (selectedLevel !== 'all') filters.level = selectedLevel;
+    if (searchQuery) filters.search = searchQuery;
+    return filters;
+  }, [selectedCategory, selectedLevel, searchQuery]);
+
+  // Fetch categories từ backend để hiển thị tabs
   useEffect(() => {
-    refetch();
+    const fetchCategories = async () => {
+      const response = await subjectsService.getAll({ limit: 1000 }); // Lấy nhiều để có đủ categories
+      if (response.success && response.data) {
+        const unique = Array.from(new Set(response.data.map((s) => s.category)));
+        setAllCategories(['all', ...unique]);
+      }
+    };
+    fetchCategories();
   }, []);
 
-  const categories = useMemo(() => {
-    const unique = Array.from(new Set(subjects.map((s) => s.category)));
-    return ['all', ...unique];
-  }, [subjects]);
+  // Refetch khi filters thay đổi
+  useEffect(() => {
+    refetch(1, 12, currentFilters);
+  }, [currentFilters]);
 
-  const filteredSubjects = useMemo(() => {
-    const query = searchQuery.toLowerCase();
-    return subjects.filter((subject) => {
-      const matchesSearch =
-        subject.name.toLowerCase().includes(query) ||
-        subject.code.toLowerCase().includes(query) ||
-        subject.category.toLowerCase().includes(query);
-      const matchesCategory = selectedCategory === 'all' || subject.category === selectedCategory;
-      const matchesLevel = selectedLevel === 'all' || subject.level === selectedLevel;
-      return matchesSearch && matchesCategory && matchesLevel;
-    });
-  }, [subjects, searchQuery, selectedCategory, selectedLevel]);
+  // Không cần filter ở client nữa vì đã filter ở backend
+  const filteredSubjects = subjects;
 
   const stats = useMemo(() => {
-    const levelCount = {
-      beginner: subjects.filter((s) => s.level === 'beginner').length,
-      intermediate: subjects.filter((s) => s.level === 'intermediate').length,
-      advanced: subjects.filter((s) => s.level === 'advanced').length,
+    // Level count và category count giờ dựa trên pagination.total vì đã filter ở backend
+    return { 
+      total: pagination.total, 
+      filtered: pagination.total, // Số lượng đã được filter ở backend
+      levelCount: {
+        beginner: 0, // Có thể thêm API riêng để lấy stats nếu cần
+        intermediate: 0,
+        advanced: 0,
+      },
+      categoryCount: {} as Record<string, number>,
+      currentPage: pagination.page,
+      totalPages: pagination.totalPages,
     };
-    const categoryCount = categories
-      .filter((c) => c !== 'all')
-      .reduce((acc, c) => {
-        acc[c] = subjects.filter((s) => s.category === c).length;
-        return acc;
-      }, {} as Record<string, number>);
-    return { total: subjects.length, filtered: filteredSubjects.length, levelCount, categoryCount };
-  }, [subjects, filteredSubjects, categories]);
+  }, [pagination]);
 
   const handleDeleteClick = (subject: Subject) => {
     setSelectedSubject(subject);
@@ -91,12 +100,20 @@ export function SubjectsList() {
       await subjectsService.delete(selectedSubject.id);
       setDeleteDialogOpen(false);
       setSelectedSubject(null);
-      refetch();
+      refetch(pagination.page, pagination.limit, currentFilters);
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : 'Có lỗi xảy ra');
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handlePageChange = (_: React.ChangeEvent<unknown>, page: number) => {
+    onPageChange(page, currentFilters);
+  };
+
+  const handleRefetch = () => {
+    refetch(1, 12, currentFilters);
   };
 
   return (
@@ -117,7 +134,7 @@ export function SubjectsList() {
 
           <Card sx={{ p: 3 }}>
             {error && (
-              <Alert severity="error" onClose={refetch} sx={{ mb: 2 }}>
+              <Alert severity="error" onClose={handleRefetch} sx={{ mb: 2 }}>
                 {error}
               </Alert>
             )}
@@ -135,17 +152,32 @@ export function SubjectsList() {
               <Stack spacing={1}>
                 <Typography variant="h6">Theo cấp độ</Typography>
                 <Stack direction="row" spacing={1} flexWrap="wrap">
-                  <Chip label={`Cơ bản (${stats.levelCount.beginner})`} color="info" variant={selectedLevel === 'beginner' ? 'filled' : 'outlined'} onClick={() => setSelectedLevel(selectedLevel === 'beginner' ? 'all' : 'beginner')} />
-                  <Chip label={`Trung cấp (${stats.levelCount.intermediate})`} color="warning" variant={selectedLevel === 'intermediate' ? 'filled' : 'outlined'} onClick={() => setSelectedLevel(selectedLevel === 'intermediate' ? 'all' : 'intermediate')} />
-                  <Chip label={`Nâng cao (${stats.levelCount.advanced})`} color="error" variant={selectedLevel === 'advanced' ? 'filled' : 'outlined'} onClick={() => setSelectedLevel(selectedLevel === 'advanced' ? 'all' : 'advanced')} />
+                  <Chip 
+                    label={selectedLevel === 'beginner' ? 'Cơ bản (đang lọc)' : 'Cơ bản'} 
+                    color="info" 
+                    variant={selectedLevel === 'beginner' ? 'filled' : 'outlined'} 
+                    onClick={() => setSelectedLevel(selectedLevel === 'beginner' ? 'all' : 'beginner')} 
+                  />
+                  <Chip 
+                    label={selectedLevel === 'intermediate' ? 'Trung cấp (đang lọc)' : 'Trung cấp'} 
+                    color="warning" 
+                    variant={selectedLevel === 'intermediate' ? 'filled' : 'outlined'} 
+                    onClick={() => setSelectedLevel(selectedLevel === 'intermediate' ? 'all' : 'intermediate')} 
+                  />
+                  <Chip 
+                    label={selectedLevel === 'advanced' ? 'Nâng cao (đang lọc)' : 'Nâng cao'} 
+                    color="error" 
+                    variant={selectedLevel === 'advanced' ? 'filled' : 'outlined'} 
+                    onClick={() => setSelectedLevel(selectedLevel === 'advanced' ? 'all' : 'advanced')} 
+                  />
                 </Stack>
               </Stack>
 
               <Stack spacing={1}>
-                <Typography variant="h6">Kết quả tìm kiếm</Typography>
+                <Typography variant="h6">Kết quả {currentFilters.category || currentFilters.level || currentFilters.search ? 'lọc' : ''}</Typography>
                 <Stack direction="row" alignItems="center" spacing={1}>
-                  <Typography variant="h4" color="text.primary">{stats.filtered}</Typography>
-                  <Typography variant="body2" color="text.secondary">/ {stats.total} môn học</Typography>
+                  <Typography variant="h4" color="text.primary">{loading ? '...' : stats.filtered}</Typography>
+                  <Typography variant="body2" color="text.secondary">môn học</Typography>
                 </Stack>
               </Stack>
             </Box>
@@ -153,9 +185,14 @@ export function SubjectsList() {
 
           <Card>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tabs value={selectedCategory === 'all' ? 0 : Math.max(0, categories.indexOf(selectedCategory))} onChange={(_, value) => setSelectedCategory(categories[value])} variant="scrollable" scrollButtons="auto">
-                {categories.map((category, index) => (
-                  <Tab key={index} label={category === 'all' ? 'Tất cả' : `${category} (${stats.categoryCount[category] || 0})`} />
+              <Tabs 
+                value={selectedCategory === 'all' ? 0 : Math.max(0, allCategories.indexOf(selectedCategory))} 
+                onChange={(_, value) => setSelectedCategory(allCategories[value])} 
+                variant="scrollable" 
+                scrollButtons="auto"
+              >
+                {allCategories.map((category, index) => (
+                  <Tab key={index} label={category === 'all' ? 'Tất cả' : category} />
                 ))}
               </Tabs>
             </Box>
@@ -209,12 +246,22 @@ export function SubjectsList() {
           </Box>
 
           {filteredSubjects.length > 0 && !loading && (
-            <Card sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
-              <Stack spacing={2} direction="row" alignItems="center">
-                <Typography variant="body2" color="text.secondary">
-                  Hiển thị {filteredSubjects.length} / {stats.total} môn học
-                </Typography>
-                <Button variant="outlined" size="small">Xem thêm</Button>
+            <Card sx={{ p: 2 }}>
+              <Stack spacing={2} alignItems="center">
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Typography variant="body2" color="text.secondary">
+                    Hiển thị {(stats.currentPage - 1) * pagination.limit + 1} - {Math.min(stats.currentPage * pagination.limit, stats.total)} / {stats.total} môn học
+                  </Typography>
+                </Stack>
+                <Pagination 
+                  count={stats.totalPages} 
+                  page={stats.currentPage} 
+                  onChange={handlePageChange}
+                  color="primary"
+                  size="large"
+                  showFirstButton
+                  showLastButton
+                />
               </Stack>
             </Card>
           )}
@@ -223,7 +270,7 @@ export function SubjectsList() {
       <AddSubjectDialog 
         open={openDialog} 
         onClose={() => setOpenDialog(false)}
-        onSuccess={refetch}
+        onSuccess={() => refetch(1, pagination.limit, currentFilters)}
       />
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Xóa môn học</DialogTitle>

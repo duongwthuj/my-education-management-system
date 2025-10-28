@@ -11,9 +11,23 @@ router.get('/', async (_req: Request, res: Response) => {
       .populate('teacherId', 'name email')
       .sort({ createdAt: -1 });
     
+    const transformed = freeSchedules.map((fs: any) => ({
+      id: fs._id?.toString() || fs.id,
+      workScheduleId: fs.workScheduleId?._id?.toString() || fs.workScheduleId?.id || fs.workScheduleId,
+      teacherId: fs.teacherId?._id?.toString() || fs.teacherId?.id || fs.teacherId,
+      teacherName: (fs.teacherId as any)?.name,
+      dayOfWeek: fs.dayOfWeek,
+      startTime: fs.startTime,
+      endTime: fs.endTime,
+      reason: fs.reason,
+      notes: fs.notes,
+      createdAt: fs.createdAt,
+      updatedAt: fs.updatedAt,
+    }));
+    
     res.json({
       success: true,
-      data: freeSchedules,
+      data: transformed,
     });
   } catch (error) {
     res.status(500).json({
@@ -32,9 +46,23 @@ router.get('/work-shift/:workScheduleId', async (req: Request, res: Response) =>
       .populate('teacherId', 'name email')
       .sort({ startTime: 1 });
     
+    const transformed = freeSchedules.map((fs: any) => ({
+      id: fs._id?.toString() || fs.id,
+      workScheduleId: fs.workScheduleId?.toString() || fs.workScheduleId,
+      teacherId: fs.teacherId?._id?.toString() || fs.teacherId?.id || fs.teacherId,
+      teacherName: (fs.teacherId as any)?.name,
+      dayOfWeek: fs.dayOfWeek,
+      startTime: fs.startTime,
+      endTime: fs.endTime,
+      reason: fs.reason,
+      notes: fs.notes,
+      createdAt: fs.createdAt,
+      updatedAt: fs.updatedAt,
+    }));
+    
     res.json({
       success: true,
-      data: freeSchedules,
+      data: transformed,
     });
   } catch (error) {
     res.status(500).json({
@@ -51,11 +79,26 @@ router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
       teacherId: req.params.teacherId,
     })
       .populate('workScheduleId')
+      .populate('teacherId', 'name email')
       .sort({ createdAt: -1 });
+    
+    const transformed = freeSchedules.map((fs: any) => ({
+      id: fs._id?.toString() || fs.id,
+      workScheduleId: fs.workScheduleId?._id?.toString() || fs.workScheduleId?.id || fs.workScheduleId,
+      teacherId: fs.teacherId?._id?.toString() || fs.teacherId?.id || fs.teacherId,
+      teacherName: (fs.teacherId as any)?.name,
+      dayOfWeek: fs.dayOfWeek,
+      startTime: fs.startTime,
+      endTime: fs.endTime,
+      reason: fs.reason,
+      notes: fs.notes,
+      createdAt: fs.createdAt,
+      updatedAt: fs.updatedAt,
+    }));
     
     res.json({
       success: true,
-      data: freeSchedules,
+      data: transformed,
     });
   } catch (error) {
     res.status(500).json({
@@ -79,9 +122,23 @@ router.get('/:id', async (req: Request, res: Response) => {
       });
     }
     
+    const transformed = {
+      id: (freeSchedule as any)._id?.toString() || (freeSchedule as any).id,
+      workScheduleId: (freeSchedule as any).workScheduleId?._id?.toString() || (freeSchedule as any).workScheduleId?.id || (freeSchedule as any).workScheduleId,
+      teacherId: (freeSchedule as any).teacherId?._id?.toString() || (freeSchedule as any).teacherId?.id || (freeSchedule as any).teacherId,
+      teacherName: ((freeSchedule as any).teacherId as any)?.name,
+      dayOfWeek: (freeSchedule as any).dayOfWeek,
+      startTime: (freeSchedule as any).startTime,
+      endTime: (freeSchedule as any).endTime,
+      reason: (freeSchedule as any).reason,
+      notes: (freeSchedule as any).notes,
+      createdAt: (freeSchedule as any).createdAt,
+      updatedAt: (freeSchedule as any).updatedAt,
+    };
+    
     res.json({
       success: true,
-      data: freeSchedule,
+      data: transformed,
     });
   } catch (error) {
     res.status(500).json({
@@ -100,9 +157,23 @@ router.post('/', async (req: Request, res: Response) => {
       .populate('workScheduleId')
       .populate('teacherId', 'name email');
     
+    const transformed = {
+      id: (populated as any)._id?.toString() || (populated as any).id,
+      workScheduleId: (populated as any).workScheduleId?._id?.toString() || (populated as any).workScheduleId?.id || (populated as any).workScheduleId,
+      teacherId: (populated as any).teacherId?._id?.toString() || (populated as any).teacherId?.id || (populated as any).teacherId,
+      teacherName: ((populated as any).teacherId as any)?.name,
+      dayOfWeek: (populated as any).dayOfWeek,
+      startTime: (populated as any).startTime,
+      endTime: (populated as any).endTime,
+      reason: (populated as any).reason,
+      notes: (populated as any).notes,
+      createdAt: (populated as any).createdAt,
+      updatedAt: (populated as any).updatedAt,
+    };
+    
     res.status(201).json({
       success: true,
-      data: populated,
+      data: transformed,
     });
   } catch (error) {
     res.status(400).json({
@@ -130,9 +201,23 @@ router.put('/:id', async (req: Request, res: Response) => {
       });
     }
     
+    const transformed = {
+      id: (freeSchedule as any)._id?.toString() || (freeSchedule as any).id,
+      workScheduleId: (freeSchedule as any).workScheduleId?._id?.toString() || (freeSchedule as any).workScheduleId?.id || (freeSchedule as any).workScheduleId,
+      teacherId: (freeSchedule as any).teacherId?._id?.toString() || (freeSchedule as any).teacherId?.id || (freeSchedule as any).teacherId,
+      teacherName: ((freeSchedule as any).teacherId as any)?.name,
+      dayOfWeek: (freeSchedule as any).dayOfWeek,
+      startTime: (freeSchedule as any).startTime,
+      endTime: (freeSchedule as any).endTime,
+      reason: (freeSchedule as any).reason,
+      notes: (freeSchedule as any).notes,
+      createdAt: (freeSchedule as any).createdAt,
+      updatedAt: (freeSchedule as any).updatedAt,
+    };
+    
     res.json({
       success: true,
-      data: freeSchedule,
+      data: transformed,
     });
   } catch (error) {
     res.status(400).json({

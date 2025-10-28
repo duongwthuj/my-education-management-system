@@ -38,7 +38,7 @@ app.get('/', (_req, res) => {
       teachers: '/api/teachers',
       subjects: '/api/subjects',
       classes: '/api/classes',
-      schedules: '/api/schedules',
+      teaches: '/api/teaches',
     },
   });
 });

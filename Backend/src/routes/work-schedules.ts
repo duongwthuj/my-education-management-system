@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import WorkSchedule from '../models/WorkSchedule';
+import TeachingSchedule from '../models/TeachingSchedule';
+import FreeSchedule from '../models/FreeSchedule';
 
 const router = Router();
 
@@ -124,6 +126,10 @@ router.delete('/:id', async (req: Request, res: Response) => {
         error: 'Không tìm thấy lịch làm việc',
       });
     }
+
+    // Also delete related teaching schedules and free schedules
+    await TeachingSchedule.deleteMany({ workScheduleId: req.params.id });
+    await FreeSchedule.deleteMany({ workScheduleId: req.params.id });
     
     res.json({
       success: true,

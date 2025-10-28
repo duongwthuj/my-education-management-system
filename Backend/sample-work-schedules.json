@@ -1,0 +1,137 @@
+[
+  {
+    "teacherEmail": "nguyen.van.a@school.edu.vn",
+    "dayOfWeek": "Thứ 2",
+    "shift": "Sáng",
+    "startTime": "07:00",
+    "endTime": "11:30",
+    "duration": 4.5,
+    "notes": "Ca dạy sáng - Lớp 10"
+  },
+  {
+    "teacherEmail": "nguyen.van.a@school.edu.vn",
+    "dayOfWeek": "Thứ 3",
+    "shift": "Chiều",
+    "startTime": "13:00",
+    "endTime": "17:00",
+    "duration": 4,
+    "notes": "Ca dạy chiều - Lớp 11"
+  },
+  {
+    "teacherEmail": "nguyen.van.a@school.edu.vn",
+    "dayOfWeek": "Thứ 4",
+    "shift": "Sáng",
+    "startTime": "07:00",
+    "endTime": "11:30",
+    "duration": 4.5,
+    "notes": "Ca dạy sáng - Lớp 10"
+  },
+  {
+    "teacherEmail": "nguyen.van.a@school.edu.vn",
+    "dayOfWeek": "Thứ 5",
+    "shift": "Chiều",
+    "startTime": "13:00",
+    "endTime": "17:00",
+    "duration": 4,
+    "notes": "Ca dạy chiều - Lớp 11"
+  },
+  {
+    "teacherEmail": "nguyen.van.a@school.edu.vn",
+    "dayOfWeek": "Thứ 6",
+    "shift": "Sáng",
+    "startTime": "07:00",
+    "endTime": "11:30",
+    "duration": 4.5,
+    "notes": "Ca dạy sáng - Lớp 10"
+  },
+  {
+    "teacherEmail": "tran.thi.b@school.edu.vn",
+    "dayOfWeek": "Thứ 2",
+    "shift": "Chiều",
+    "startTime": "13:00",
+    "endTime": "17:00",
+    "duration": 4,
+    "notes": "Ca dạy chiều - Toán"
+  },
+  {
+    "teacherEmail": "tran.thi.b@school.edu.vn",
+    "dayOfWeek": "Thứ 3",
+    "shift": "Sáng",
+    "startTime": "07:00",
+    "endTime": "11:30",
+    "duration": 4.5,
+    "notes": "Ca dạy sáng - Toán"
+  },
+  {
+    "teacherEmail": "tran.thi.b@school.edu.vn",
+    "dayOfWeek": "Thứ 4",
+    "shift": "Chiều",
+    "startTime": "13:00",
+    "endTime": "17:00",
+    "duration": 4,
+    "notes": "Ca dạy chiều - Toán"
+  },
+  {
+    "teacherEmail": "tran.thi.b@school.edu.vn",
+    "dayOfWeek": "Thứ 5",
+    "shift": "Sáng",
+    "startTime": "07:00",
+    "endTime": "11:30",
+    "duration": 4.5,
+    "notes": "Ca dạy sáng - Toán"
+  },
+  {
+    "teacherEmail": "le.van.c@school.edu.vn",
+    "dayOfWeek": "Thứ 2",
+    "shift": "Sáng",
+    "startTime": "07:00",
+    "endTime": "11:30",
+    "duration": 4.5,
+    "notes": "Ca dạy sáng - Tiếng Anh"
+  },
+  {
+    "teacherEmail": "le.van.c@school.edu.vn",
+    "dayOfWeek": "Thứ 3",
+    "shift": "Chiều",
+    "startTime": "13:00",
+    "endTime": "17:00",
+    "duration": 4,
+    "notes": "Ca dạy chiều - Tiếng Anh"
+  },
+  {
+    "teacherEmail": "le.van.c@school.edu.vn",
+    "dayOfWeek": "Thứ 6",
+    "shift": "Sáng",
+    "startTime": "07:00",
+    "endTime": "11:30",
+    "duration": 4.5,
+    "notes": "Ca dạy sáng - Tiếng Anh"
+  },
+  {
+    "teacherEmail": "pham.thi.d@school.edu.vn",
+    "dayOfWeek": "Thứ 2",
+    "shift": "Chiều",
+    "startTime": "13:00",
+    "endTime": "17:00",
+    "duration": 4,
+    "notes": "Ca dạy chiều - Lịch Sử"
+  },
+  {
+    "teacherEmail": "pham.thi.d@school.edu.vn",
+    "dayOfWeek": "Thứ 4",
+    "shift": "Sáng",
+    "startTime": "07:00",
+    "endTime": "11:30",
+    "duration": 4.5,
+    "notes": "Ca dạy sáng - Lịch Sử"
+  },
+  {
+    "teacherEmail": "pham.thi.d@school.edu.vn",
+    "dayOfWeek": "Thứ 5",
+    "shift": "Chiều",
+    "startTime": "13:00",
+    "endTime": "17:00",
+    "duration": 4,
+    "notes": "Ca dạy chiều - Lịch Sử"
+  }
+]

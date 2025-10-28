@@ -41,7 +41,7 @@ import {
 import { Teacher, Subject } from '@/types';
 import { useTeacher } from '@/hooks/use-teachers';
 import { useSubjects } from '@/hooks/use-subjects';
-import { useSchedules } from '@/hooks/use-schedules';
+import { useTeaches } from '@/hooks/useTeaches';
 import { EditTeacherDialog } from './edit-teacher-dialog';
 import { AddSubjectToTeacherDialog } from './add-subject-to-teacher-dialog';
 
@@ -52,13 +52,13 @@ interface TeacherDetailProps {
 export function TeacherDetail({ teacherId }: TeacherDetailProps) {
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [teacherSubjects, setTeacherSubjects] = useState<Subject[]>([]);
-  const [teacherSchedules, setTeacherSchedules] = useState<any[]>([]);
+  const [teacherTeaches, setTeacherTeaches] = useState<any[]>([]);
   const [tabValue, setTabValue] = useState(0);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addSubjectDialogOpen, setAddSubjectDialogOpen] = useState(false);
   const { teacher: teacherData, loading, error, refetch } = useTeacher(teacherId);
   const { subjects, loading: loadingSubjects } = useSubjects();
-  const { schedules, loading: loadingSchedules } = useSchedules();
+  const { teaches, loading: loadingTeaches } = useTeaches();
 
   useEffect(() => {
     if (teacherData) {
@@ -69,13 +69,13 @@ export function TeacherDetail({ teacherId }: TeacherDetailProps) {
   }, [teacherData, subjects]);
 
   useEffect(() => {
-    if (teacher && schedules.length > 0) {
-      const filtered = schedules.filter(s => String(s.teacherId) === String(teacher.id));
-      setTeacherSchedules(filtered);
+    if (teacher && teaches.length > 0) {
+      const filtered = teaches.filter(t => String(t.teacherId) === String(teacher.id));
+      setTeacherTeaches(filtered);
     }
-  }, [teacher, schedules]);
+  }, [teacher, teaches]);
 
-  if (loading || loadingSubjects || loadingSchedules) {
+  if (loading || loadingSubjects || loadingTeaches) {
     return (
       <Box sx={{ flexGrow: 1, py: 8, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
         <CircularProgress />
@@ -101,9 +101,9 @@ export function TeacherDetail({ teacherId }: TeacherDetailProps) {
     );
   }
 
-  const schedulesByDay = teacherSchedules.reduce((acc: any, schedule) => {
-    if (!acc[schedule.dayOfWeek]) acc[schedule.dayOfWeek] = [];
-    acc[schedule.dayOfWeek].push(schedule);
+  const teachesByDay = teacherTeaches.reduce((acc: any, teach) => {
+    if (!acc[teach.dayOfWeek]) acc[teach.dayOfWeek] = [];
+    acc[teach.dayOfWeek].push(teach);
     return acc;
   }, {});
 
@@ -253,9 +253,9 @@ export function TeacherDetail({ teacherId }: TeacherDetailProps) {
                 {/* Tab 2: Lịch dạy */}
                 {tabValue === 2 && (
                   <>
-                    {Object.keys(schedulesByDay).length > 0 ? (
+                    {Object.keys(teachesByDay).length > 0 ? (
                       <Stack spacing={3}>
-                        {Object.keys(schedulesByDay).map((day) => (
+                        {Object.keys(teachesByDay).map((day) => (
                           <Box key={day}>
                             <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, color: 'primary.main' }}>
                               {day}
@@ -266,22 +266,22 @@ export function TeacherDetail({ teacherId }: TeacherDetailProps) {
                                   <TableRow sx={{ bgcolor: 'action.hover' }}>
                                     <TableCell sx={{ fontWeight: 600 }}>Thời gian</TableCell>
                                     <TableCell sx={{ fontWeight: 600 }}>Môn</TableCell>
-                                    <TableCell sx={{ fontWeight: 600 }}>Phòng</TableCell>
+                                    <TableCell sx={{ fontWeight: 600 }}>Lớp</TableCell>
                                   </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                  {schedulesByDay[day].map((sch: any, idx: number) => {
-                                    const sub = subjects.find(s => String(s.id) === String(sch.subjectId));
+                                  {teachesByDay[day].map((teach: any, idx: number) => {
+                                    const sub = subjects.find(s => String(s.id) === String(teach.subjectId));
                                     return (
                                       <TableRow key={idx} hover sx={{ height: '72px' }}>
                                         <TableCell>
                                           <Typography variant="body2" fontWeight={500}>
-                                            {sch.startTime} - {sch.endTime}
+                                            {teach.startTime} - {teach.endTime}
                                           </Typography>
                                         </TableCell>
                                         <TableCell>{sub?.name || 'N/A'}</TableCell>
                                         <TableCell>
-                                          <Chip label={sch.room || 'N/A'} size="small" variant="outlined" />
+                                          <Chip label={teach.className || 'N/A'} size="small" variant="outlined" />
                                         </TableCell>
                                       </TableRow>
                                     );

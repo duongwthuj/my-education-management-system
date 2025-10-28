@@ -21,8 +21,16 @@ export const subjectsService = {
   /**
    * Get all subjects
    */
-  async getAll(): Promise<ApiResponse<Subject[]>> {
-    return apiClient.get<Subject[]>('/subjects');
+  async getAll(params?: { page?: number; limit?: number; category?: string; level?: string; search?: string }): Promise<ApiResponse<Subject[]>> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.level) queryParams.append('level', params.level);
+    if (params?.search) queryParams.append('search', params.search);
+    
+    const url = `/subjects${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return apiClient.get<Subject[]>(url);
   },
 
   /**

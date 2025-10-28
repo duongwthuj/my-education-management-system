@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import {
   Box,
   Button,
@@ -26,11 +26,16 @@ import {
 } from '@mui/material';
 import { FreeSchedule } from '@/types/schedule';
 import { useFreeSchedules } from '@/hooks/useFreeSchedules';
+import { useTeachers } from '@/hooks/use-teachers';
 
-export function FreeSchedulesList() {
+export const FreeSchedulesList = forwardRef(function FreeSchedulesListComponent(_props, ref) {
   const { freeSchedules, loading, error, fetchAll, create, update, remove } = useFreeSchedules();
+  const { teachers } = useTeachers();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<FreeSchedule>>({
     workScheduleId: '',
     teacherId: '',
@@ -40,6 +45,19 @@ export function FreeSchedulesList() {
     reason: 'break',
     notes: '',
   });
+
+  // Expose refetch method to parent
+  useImperativeHandle(ref, () => ({
+    refetch: async () => {
+      console.log('🔄 FreeSchedulesList: Refetching from parent trigger...');
+      await fetchAll();
+    },
+  }), [fetchAll]);
+
+  // Filter schedules by selected teacher
+  const filteredFreeSchedules = selectedTeacherId 
+    ? freeSchedules.filter(fs => String(fs.teacherId) === selectedTeacherId)
+    : freeSchedules;
 
   useEffect(() => {
     fetchAll();
@@ -67,24 +85,45 @@ export function FreeSchedulesList() {
   const handleClose = () => {
     setOpen(false);
     setEditingId(null);
+    setSubmitError(null);
   };
 
   const handleSave = async () => {
     try {
+      setSubmitting(true);
+      setSubmitError(null);
+
+      // Validation
+      if (!formData.teacherId || !formData.dayOfWeek || !formData.startTime || !formData.endTime || !formData.reason) {
+        setSubmitError('Vui lòng điền tất cả các trường bắt buộc');
+        return;
+      }
+
       if (editingId) {
         await update(editingId, formData);
       } else {
         await create(formData as Omit<FreeSchedule, 'id' | 'createdAt' | 'updatedAt'>);
       }
+      
+      await fetchAll();
       handleClose();
     } catch (err) {
-      console.error('Lỗi lưu:', err);
+      setSubmitError(err instanceof Error ? err.message : 'Có lỗi xảy ra');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Bạn chắc chắn muốn xóa?')) {
+    if (!confirm('Bạn có chắc chắn muốn xóa lịch rảnh này?')) {
+      return;
+    }
+    
+    try {
       await remove(id);
+      await fetchAll();
+    } catch (err) {
+      alert('Lỗi xóa: ' + (err instanceof Error ? err.message : 'Có lỗi xảy ra'));
     }
   };
 
@@ -104,9 +143,26 @@ export function FreeSchedulesList() {
     <Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      <Button variant="contained" onClick={() => handleOpen()} sx={{ mb: 2 }}>
-        ➕ Thêm Lịch Rảnh
-      </Button>
+      <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+        <FormControl sx={{ minWidth: 250 }}>
+          <InputLabel>Lọc theo giáo viên</InputLabel>
+          <Select
+            value={selectedTeacherId}
+            onChange={(e) => setSelectedTeacherId(e.target.value)}
+            label="Lọc theo giáo viên"
+          >
+            <MenuItem value="">Tất cả giáo viên</MenuItem>
+            {teachers.map((teacher) => (
+              <MenuItem key={teacher.id} value={String(teacher.id)}>
+                {teacher.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Button variant="contained" onClick={() => handleOpen()}>
+          ➕ Thêm Lịch Rảnh
+        </Button>
+      </Box>
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -126,10 +182,11 @@ export function FreeSchedulesList() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {freeSchedules.length > 0 ? (
-                freeSchedules.map((fs) => (
+              {filteredFreeSchedules.length > 0 ? (
+                filteredFreeSchedules.map((fs) => {
+                  return (
                   <TableRow key={fs.id} hover>
-                    <TableCell sx={{ fontSize: '0.85rem' }}>{fs.teacherId}</TableCell>
+                    <TableCell sx={{ fontSize: '0.85rem' }}>{(fs as any).teacherName || 'N/A'}</TableCell>
                     <TableCell>{fs.dayOfWeek}</TableCell>
                     <TableCell>
                       {fs.startTime} - {fs.endTime}
@@ -151,7 +208,8 @@ export function FreeSchedulesList() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))
+                );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} align="center">
@@ -164,24 +222,25 @@ export function FreeSchedulesList() {
         </TableContainer>
       )}
 
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth PaperProps={{ elevation: 8 }}>
         <DialogTitle>{editingId ? '✏️ Sửa Lịch Rảnh' : '➕ Thêm Lịch Rảnh'}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          <TextField
-            label="Work Schedule ID"
-            value={formData.workScheduleId || ''}
-            onChange={(e) => setFormData({ ...formData, workScheduleId: e.target.value })}
-            fullWidth
-            size="small"
-          />
-
-          <TextField
-            label="Teacher ID"
-            value={formData.teacherId || ''}
-            onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
-            fullWidth
-            size="small"
-          />
+          {submitError && <Alert severity="error">{submitError}</Alert>}
+          
+          <FormControl fullWidth size="small">
+            <InputLabel>Giáo viên</InputLabel>
+            <Select
+              value={formData.teacherId || ''}
+              onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
+              label="Giáo viên"
+            >
+              {teachers.map((teacher) => (
+                <MenuItem key={teacher.id} value={teacher.id}>
+                  {teacher.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <FormControl fullWidth size="small">
             <InputLabel>Ngày trong tuần</InputLabel>
@@ -243,11 +302,15 @@ export function FreeSchedulesList() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose}>Hủy</Button>
-          <Button onClick={handleSave} variant="contained">
-            Lưu
+          <Button 
+            onClick={handleSave} 
+            variant="contained"
+            disabled={submitting}
+          >
+            {submitting ? 'Đang xử lý...' : 'Lưu'}
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
-}
+});

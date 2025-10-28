@@ -1,3 +1,20 @@
+// Teach - Fixed/Session Class Assignment
+export interface Teach {
+  _id?: string;
+  id?: string;
+  teacherId: string;
+  subjectId: string;
+  className?: string;
+  sessionClassId?: string;
+  classType: 'fixed' | 'session';
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Schedule {
   _id?: string;
   id?: string;

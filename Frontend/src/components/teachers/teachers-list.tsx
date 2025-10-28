@@ -14,14 +14,16 @@ import {
   CircularProgress,
   Alert
 } from '@mui/material';
-import { MagnifyingGlass, Plus } from '@phosphor-icons/react';
+import { MagnifyingGlass, Plus, Upload } from '@phosphor-icons/react';
 import { TeachersTable } from './teachers-table';
 import { useTeachers } from '@/hooks/use-teachers';
 import { AddTeacherDialog } from './add-teacher-dialog';
+import { ImportTeachDialog } from './import-teach-dialog';
 
 export function TeachersList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const { teachers, loading, error, refetch } = useTeachers();
 
   const filteredTeachers = teachers.filter((teacher) =>
@@ -68,7 +70,15 @@ export function TeachersList() {
                   </Typography>
                 </Stack>
               </Stack>
-              <div>
+              <Stack direction="row" spacing={2}>
+                <Button
+                  startIcon={<Upload fontSize="var(--icon-fontSize-md)" />}
+                  variant="outlined"
+                  disabled={loading}
+                  onClick={() => setImportDialogOpen(true)}
+                >
+                  Import Lớp Cố Định
+                </Button>
                 <Button
                   startIcon={<Plus fontSize="var(--icon-fontSize-md)" />}
                   variant="contained"
@@ -77,7 +87,7 @@ export function TeachersList() {
                 >
                   Thêm giáo viên
                 </Button>
-              </div>
+              </Stack>
             </Stack>
             {error && (
               <Alert severity="error" onClose={refetch}>
@@ -124,6 +134,11 @@ export function TeachersList() {
       <AddTeacherDialog 
         open={openDialog} 
         onClose={() => setOpenDialog(false)}
+        onSuccess={refetch}
+      />
+      <ImportTeachDialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
         onSuccess={refetch}
       />
     </>

@@ -26,11 +26,14 @@ import {
 } from '@mui/material';
 import { WorkSchedule } from '@/types/schedule';
 import { useWorkSchedules } from '@/hooks/useWorkSchedules';
+import { useTeachers } from '@/hooks/use-teachers';
 
 export function WorkSchedulesList() {
   const { workSchedules, loading, error, fetchAll, create, update, remove } = useWorkSchedules();
+  const { teachers } = useTeachers();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
   const [formData, setFormData] = useState<Partial<WorkSchedule>>({
     teacherId: '',
     dayOfWeek: 'Thứ 2',
@@ -41,6 +44,11 @@ export function WorkSchedulesList() {
     status: 'scheduled',
     notes: '',
   });
+
+  // Filter schedules by selected teacher
+  const filteredWorkSchedules = selectedTeacherId 
+    ? workSchedules.filter(ws => String(ws.teacherId) === selectedTeacherId)
+    : workSchedules;
 
   useEffect(() => {
     fetchAll();
@@ -101,9 +109,26 @@ export function WorkSchedulesList() {
     <Box>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      <Button variant="contained" onClick={() => handleOpen()} sx={{ mb: 2 }}>
-        ➕ Thêm Ca Làm
-      </Button>
+      <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+        <FormControl sx={{ minWidth: 250 }}>
+          <InputLabel>Lọc theo giáo viên</InputLabel>
+          <Select
+            value={selectedTeacherId}
+            onChange={(e) => setSelectedTeacherId(e.target.value)}
+            label="Lọc theo giáo viên"
+          >
+            <MenuItem value="">Tất cả giáo viên</MenuItem>
+            {teachers.map((teacher) => (
+              <MenuItem key={teacher.id} value={String(teacher.id)}>
+                {teacher.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Button variant="contained" onClick={() => handleOpen()}>
+          ➕ Thêm Ca Làm
+        </Button>
+      </Box>
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -124,10 +149,12 @@ export function WorkSchedulesList() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {workSchedules.length > 0 ? (
-                workSchedules.map((ws) => (
+              {filteredWorkSchedules.length > 0 ? (
+                filteredWorkSchedules.map((ws) => {
+                  const teacherName = (typeof ws.teacherId === 'object' ? (ws.teacherId as any)?.name : ws.teacherId) || 'N/A';
+                  return (
                   <TableRow key={ws.id} hover>
-                    <TableCell sx={{ fontSize: '0.9rem' }}>{ws.teacherId}</TableCell>
+                    <TableCell sx={{ fontSize: '0.9rem' }}>{teacherName || 'N/A'}</TableCell>
                     <TableCell>{ws.dayOfWeek}</TableCell>
                     <TableCell>
                       <Chip
@@ -152,7 +179,8 @@ export function WorkSchedulesList() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))
+                );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} align="center">
