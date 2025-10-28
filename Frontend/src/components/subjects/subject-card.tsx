@@ -39,7 +39,7 @@ const levelMap = {
 };
 
 export const SubjectCard = memo(function SubjectCard({ subject, onDeleteClick }: SubjectCardProps) {
-  const teachersCount = subject.teachers.length;
+  const teachersCount = Array.isArray(subject.teachers) ? subject.teachers.length : 0;
   const [elevated, setElevated] = useState(false);
   
   return (
