@@ -10,15 +10,6 @@ export interface ITeacher {
   education: string;
   bio: string;
   subjects: string[];
-  fixedClasses?: Array<{
-    classId: string;
-    subjectId: string;
-    dayOfWeek: string;
-    shift: string;
-    startTime: string;
-    endTime: string;
-    room?: string;
-  }>;
 }
 
 // Subject

@@ -23,7 +23,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     const skip = (pageNum - 1) * limitNum;
     const [subjects, total] = await Promise.all([
-      Subject.find(query).skip(skip).limit(limitNum).lean(),
+      Subject.find(query).skip(skip).limit(limitNum).populate('teachers', 'id name email').lean(),
       Subject.countDocuments(query),
     ]);
 
@@ -45,7 +45,7 @@ router.get('/', async (req: Request, res: Response) => {
 // GET /api/subjects/:id
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const subject = await Subject.findById(req.params.id).lean();
+    const subject = await Subject.findById(req.params.id).populate('teachers').lean();
     if (!subject) {
       return res.status(404).json({ success: false, error: 'Không tìm thấy môn học' });
     }

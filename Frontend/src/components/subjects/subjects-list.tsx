@@ -41,7 +41,7 @@ export function SubjectsList() {
   const [allCategories, setAllCategories] = useState<string[]>(['all']);
   const { subjects, loading, error, pagination, refetch, onPageChange } = useSubjects();
 
-  // Tạo filters object từ state
+  // Tạo filters object từ state (move to top để dùng trong useEffect)
   const currentFilters = useMemo(() => {
     const filters: { category?: string; level?: string; search?: string } = {};
     if (selectedCategory !== 'all') filters.category = selectedCategory;
@@ -64,8 +64,8 @@ export function SubjectsList() {
 
   // Refetch khi filters thay đổi
   useEffect(() => {
-    refetch(1, 12, currentFilters);
-  }, [currentFilters]);
+    refetch(1, pagination.limit, currentFilters);
+  }, [currentFilters, refetch, pagination.limit]);
 
   // Không cần filter ở client nữa vì đã filter ở backend
   const filteredSubjects = subjects;
@@ -127,9 +127,19 @@ export function SubjectsList() {
                 Quản lý danh sách và thông tin các môn học
               </Typography>
             </Stack>
-            <Button startIcon={<Plus fontSize="var(--icon-fontSize-md)" />} variant="contained" disabled={loading} onClick={() => setOpenDialog(true)}>
-              Thêm môn học
-            </Button>
+            <Stack direction="row" spacing={1}>
+              <Button 
+                startIcon={<MagnifyingGlass fontSize="var(--icon-fontSize-md)" />} 
+                variant="outlined" 
+                disabled={loading} 
+                onClick={handleRefetch}
+              >
+                Làm mới
+              </Button>
+              <Button startIcon={<Plus fontSize="var(--icon-fontSize-md)" />} variant="contained" disabled={loading} onClick={() => setOpenDialog(true)}>
+                Thêm môn học
+              </Button>
+            </Stack>
           </Stack>
 
           <Card sx={{ p: 3 }}>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -11,12 +11,12 @@ import {
   CircularProgress,
   Stack,
   TextField,
-  InputAdornment,
+  Autocomplete,
   Typography,
 } from '@mui/material';
-import { MagnifyingGlass } from '@phosphor-icons/react';
 import { Subject } from '@/types';
 import { teachersService } from '@/services/teachers.service';
+import { subjectsService } from '@/services/subjects.service';
 
 interface AddSubjectToTeacherDialogProps {
   open: boolean;
@@ -36,22 +36,70 @@ export function AddSubjectToTeacherDialog({
   onSuccess,
 }: AddSubjectToTeacherDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedSubjects, setSelectedSubjects] = useState<Subject[]>([]);
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+
+  // Fetch tất cả subjects khi dialog mở
+  useEffect(() => {
+    if (!open) return;
+
+    const fetchAllSubjects = async () => {
+      setLoadingSubjects(true);
+      try {
+        const response = await subjectsService.getAll({ limit: 999 });
+        if (response.success && response.data) {
+          // Extract học phần từ tên môn (VD: "Bé làm game - học phần 1" → 1)
+          const extractSemester = (name: string): number => {
+            const match = name.match(/học phần\s*(\d+)/i);
+            return match ? parseInt(match[1], 10) : 999; // 999 cho những môn không có học phần
+          };
+          
+          // Sort theo học phần trước, rồi sắp xếp theo tên
+          const sorted = [...response.data].sort((a, b) => {
+            const semesterA = extractSemester(a.name);
+            const semesterB = extractSemester(b.name);
+            
+            if (semesterA !== semesterB) {
+              return semesterA - semesterB; // Sort theo học phần (tăng dần)
+            }
+            // Nếu cùng học phần, sort theo tên (A-Z)
+            return a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' });
+          });
+          setAllSubjects(sorted);
+        }
+      } catch (err) {
+        console.error('Failed to fetch subjects:', err);
+      } finally {
+        setLoadingSubjects(false);
+      }
+    };
+
+    fetchAllSubjects();
+  }, [open]);
 
   const handleClose = () => {
-    setSelectedSubjectId('');
+    setSelectedSubjects([]);
     setSearchQuery('');
     setError(null);
     onClose();
   };
 
   const handleSubmit = async () => {
-    if (!selectedSubjectId) return;
+    if (selectedSubjects.length === 0) {
+      setError('Vui lòng chọn ít nhất một môn học');
+      return;
+    }
 
-    if (currentSubjectIds.includes(selectedSubjectId)) {
-      setError('Môn học này đã được gán cho giáo viên');
+    // Kiểm tra có môn nào đã được gán không
+    const alreadyAssigned = selectedSubjects.filter(s => 
+      currentSubjectIds.includes(s.id)
+    );
+    
+    if (alreadyAssigned.length > 0) {
+      setError(`Các môn này đã được gán: ${alreadyAssigned.map(s => s.name).join(', ')}`);
       return;
     }
 
@@ -59,7 +107,8 @@ export function AddSubjectToTeacherDialog({
     setError(null);
 
     try {
-      const newSubjectsArray = [...currentSubjectIds, selectedSubjectId];
+      const newSubjectIds = selectedSubjects.map(s => s.id);
+      const newSubjectsArray = [...currentSubjectIds, ...newSubjectIds];
       
       const response = await teachersService.update(teacherId, {
         subjects: newSubjectsArray,
@@ -79,12 +128,13 @@ export function AddSubjectToTeacherDialog({
     }
   };
 
-  const filteredSubjects = availableSubjects.filter(
-    (s) =>
-      (s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.code.toLowerCase().includes(searchQuery.toLowerCase())) &&
-      !currentSubjectIds.includes(s.id)
-  );
+  // Filter out already assigned subjects và apply search
+  const availableSubjectsToAdd = allSubjects
+    .filter((s) => !currentSubjectIds.includes(s.id))
+    .filter((s) => {
+      const query = searchQuery.toLowerCase();
+      return s.name.toLowerCase().includes(query) || s.code.toLowerCase().includes(query);
+    });
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
@@ -104,48 +154,51 @@ export function AddSubjectToTeacherDialog({
         )}
 
         <Stack spacing={2}>
+          {/* Search field */}
           <TextField
             fullWidth
-            placeholder="Tìm kiếm môn học..."
+            size="small"
+            placeholder="Tìm kiếm theo tên hoặc mã môn học (VD: Toán, MATH)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            disabled={loading}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <MagnifyingGlass size={20} />
-                </InputAdornment>
-              ),
-            }}
+            disabled={loadingSubjects}
+            sx={{ mb: 1 }}
           />
 
-          <Stack spacing={1}>
-            <label htmlFor="subject-select" style={{ fontWeight: 500, fontSize: '0.875rem' }}>
-              Chọn môn học
-            </label>
-            <select
-              id="subject-select"
-              value={selectedSubjectId}
-              onChange={(e) => setSelectedSubjectId(e.target.value)}
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                fontSize: '1rem',
-                fontFamily: 'inherit',
-                cursor: loading ? 'not-allowed' : 'pointer',
-              }}
-            >
-              <option value="">-- Chọn môn học --</option>
-              {filteredSubjects.map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.name} — {subject.code}
-                </option>
-              ))}
-            </select>
-          </Stack>
+          {loadingSubjects ? (
+            <Stack alignItems="center" sx={{ py: 3 }}>
+              <CircularProgress size={32} />
+              <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+                Đang tải tất cả {allSubjects.length} môn học...
+              </Typography>
+            </Stack>
+          ) : (
+            <>
+              <Typography variant="caption" color="text.secondary">
+                Có {availableSubjectsToAdd.length} môn học có thể thêm {selectedSubjects.length > 0 && `(đã chọn: ${selectedSubjects.length})`}
+              </Typography>
+              <Autocomplete
+                fullWidth
+                multiple
+                options={availableSubjectsToAdd}
+                getOptionLabel={(option) => `${option.name} — ${option.code}`}
+                value={selectedSubjects}
+                onChange={(_event, newValue) => setSelectedSubjects(newValue)}
+                disabled={loading || loadingSubjects}
+                loading={loading}
+                noOptionsText={searchQuery ? 'Không tìm thấy môn học phù hợp' : 'Tất cả môn đều đã gán'}
+                loadingText="Đang tải..."
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Chọn một hoặc nhiều môn học"
+                    placeholder="Chọn môn..."
+                  />
+                )}
+                isOptionEqualToValue={(option, value) => option?.id === value?.id}
+              />
+            </>
+          )}
         </Stack>
       </DialogContent>
 
@@ -156,9 +209,9 @@ export function AddSubjectToTeacherDialog({
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={loading || !selectedSubjectId}
+          disabled={loading || selectedSubjects.length === 0}
         >
-          {loading ? <CircularProgress size={24} /> : 'Lưu'}
+          {loading ? <CircularProgress size={24} /> : `Lưu (${selectedSubjects.length} môn)`}
         </Button>
       </DialogActions>
     </Dialog>

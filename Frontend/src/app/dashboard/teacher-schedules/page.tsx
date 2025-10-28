@@ -29,7 +29,6 @@ export default function TeacherSchedulePage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
   const freeSchedulesListRef = useRef<{ refetch: () => Promise<void> }>(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const loading = teachesLoading || teachersLoading;
   const error = teachesError || teachersError;
@@ -60,17 +59,14 @@ export default function TeacherSchedulePage() {
   }
 
   const handleGenerateSuccess = async () => {
-    console.log('✅ Generate success! Triggering refresh...');
+    console.log('✅ Generate success! Refetching data...');
     fetchAllTeaches();
-    // Trigger full refresh
-    setRefreshTrigger(prev => prev + 1);
-    // Also try manual refetch
-    setTimeout(() => {
-      if (freeSchedulesListRef.current?.refetch) {
-        console.log('🔄 Calling refetch on FreeSchedulesList...');
-        freeSchedulesListRef.current.refetch().catch(err => console.error('Refetch error:', err));
-      }
-    }, 500);
+    // Reload FreeSchedules
+    if (freeSchedulesListRef.current?.refetch) {
+      console.log('🔄 Calling refetch on FreeSchedulesList...');
+      await freeSchedulesListRef.current.refetch();
+      console.log('✅ FreeSchedulesList refetch complete');
+    }
   };
 
   return (
@@ -161,7 +157,7 @@ export default function TeacherSchedulePage() {
                     </TabPanel>
 
                     <TabPanel value={tabValue} index={2}>
-                      <FreeSchedulesList ref={freeSchedulesListRef} key={refreshTrigger} />
+                      <FreeSchedulesList ref={freeSchedulesListRef} />
                     </TabPanel>
                   </>
                 )}

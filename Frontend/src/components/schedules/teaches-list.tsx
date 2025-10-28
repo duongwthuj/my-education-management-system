@@ -38,6 +38,8 @@ export function TeachesList() {
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [allSubjects, setAllSubjects] = useState<typeof subjects>([]);
+  const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [formData, setFormData] = useState<Partial<Teach>>({
     teacherId: '',
     subjectId: '',
@@ -48,6 +50,29 @@ export function TeachesList() {
     endTime: '10:00',
     notes: '',
   });
+
+  // Fetch all subjects on mount
+  useEffect(() => {
+    const fetchAllSubjects = async () => {
+      try {
+        setLoadingSubjects(true);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${apiUrl}/api/subjects?limit=999`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && Array.isArray(data.data)) {
+            console.log('✅ Fetched all subjects:', data.data.length);
+            setAllSubjects(data.data);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch all subjects:', err);
+      } finally {
+        setLoadingSubjects(false);
+      }
+    };
+    fetchAllSubjects();
+  }, []);
 
   // Filter teaches by selected teacher
   const filteredTeaches = selectedTeacherId 
@@ -222,7 +247,8 @@ export function TeachesList() {
             <TableBody>
               {filteredTeaches.map((teach) => {
                 const teacher = teachers.find(t => String(t.id) === String(teach.teacherId));
-                const subject = subjects.find(s => String(s.id) === String(teach.subjectId));
+                const subjectsToUse = allSubjects.length > 0 ? allSubjects : subjects;
+                const subject = subjectsToUse.find(s => String(s.id) === String(teach.subjectId));
 
                 return (
                   <TableRow key={teach.id} hover>
@@ -292,7 +318,7 @@ export function TeachesList() {
               onChange={(e) => setFormData({ ...formData, subjectId: e.target.value })}
               label="Môn học"
             >
-              {subjects.map((subject) => (
+              {(allSubjects.length > 0 ? allSubjects : subjects).map((subject) => (
                 <MenuItem key={subject.id} value={subject.id}>
                   {subject.name}
                 </MenuItem>
