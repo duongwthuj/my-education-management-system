@@ -21,8 +21,8 @@ router.get('/', async (req: Request, res: Response) => {
     // Transform data to convert _id to id
     const transformedTeaches = teaches.map((teach: any) => ({
       id: teach._id?.toString(),
-      teacherId: teach.teacherId?._id?.toString() || teach.teacherId,
-      subjectId: teach.subjectId?._id?.toString() || teach.subjectId,
+      teacherId: typeof teach.teacherId === 'object' ? teach.teacherId._id?.toString() : teach.teacherId?.toString(),
+      subjectId: typeof teach.subjectId === 'object' ? teach.subjectId._id?.toString() : teach.subjectId?.toString(),
       className: teach.className,
       sessionClassId: teach.sessionClassId?.toString(),
       classType: teach.classType,
@@ -48,8 +48,8 @@ router.get('/teacher/:teacherId', async (req: Request, res: Response) => {
     // Transform data to convert _id to id
     const transformedTeaches = teaches.map((teach: any) => ({
       id: teach._id?.toString(),
-      teacherId: teach.teacherId?._id?.toString() || teach.teacherId,
-      subjectId: teach.subjectId?._id?.toString() || teach.subjectId,
+      teacherId: typeof teach.teacherId === 'object' ? teach.teacherId._id?.toString() : teach.teacherId?.toString(),
+      subjectId: typeof teach.subjectId === 'object' ? teach.subjectId._id?.toString() : teach.subjectId?.toString(),
       className: teach.className,
       sessionClassId: teach.sessionClassId?.toString(),
       classType: teach.classType,
@@ -78,16 +78,16 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     // Transform data to convert _id to id
     const transformedTeach = {
-      id: teach._id?.toString(),
-      teacherId: teach.teacherId?._id?.toString() || teach.teacherId,
-      subjectId: teach.subjectId?._id?.toString() || teach.subjectId,
-      className: teach.className,
-      sessionClassId: teach.sessionClassId?.toString(),
-      classType: teach.classType,
-      dayOfWeek: teach.dayOfWeek,
-      startTime: teach.startTime,
-      endTime: teach.endTime,
-      notes: teach.notes,
+      id: (teach as any)._id?.toString(),
+      teacherId: typeof (teach as any).teacherId === 'object' ? (teach as any).teacherId._id?.toString() : (teach as any).teacherId?.toString(),
+      subjectId: typeof (teach as any).subjectId === 'object' ? (teach as any).subjectId._id?.toString() : (teach as any).subjectId?.toString(),
+      className: (teach as any).className,
+      sessionClassId: (teach as any).sessionClassId?.toString(),
+      classType: (teach as any).classType,
+      dayOfWeek: (teach as any).dayOfWeek,
+      startTime: (teach as any).startTime,
+      endTime: (teach as any).endTime,
+      notes: (teach as any).notes,
     };
 
     res.json({ success: true, data: transformedTeach });
@@ -111,8 +111,8 @@ router.post('/', async (req: Request, res: Response) => {
     // Transform data to convert _id to id
     const transformedTeach = {
       id: (populated as any)._id?.toString(),
-      teacherId: (populated as any).teacherId?._id?.toString() || (populated as any).teacherId,
-      subjectId: (populated as any).subjectId?._id?.toString() || (populated as any).subjectId,
+      teacherId: typeof (populated as any).teacherId === 'object' ? (populated as any).teacherId._id?.toString() : (populated as any).teacherId?.toString(),
+      subjectId: typeof (populated as any).subjectId === 'object' ? (populated as any).subjectId._id?.toString() : (populated as any).subjectId?.toString(),
       className: (populated as any).className,
       sessionClassId: (populated as any).sessionClassId?.toString(),
       classType: (populated as any).classType,
@@ -141,22 +141,70 @@ router.post('/', async (req: Request, res: Response) => {
 // PUT /api/teaches/:id - Update teach assignment
 router.put('/:id', async (req: Request, res: Response) => {
   try {
+    // First, get the current teach to check for duplicates
+    const currentTeach = await Teach.findById(req.params.id);
+    if (!currentTeach) {
+      return res.status(404).json({ success: false, error: 'Không tìm thấy phân công dạy' });
+    }
+
+    // Check if we're changing the time slot
+    const teacherIdChanged = req.body.teacherId && req.body.teacherId !== currentTeach.teacherId.toString();
+    const dayChanged = req.body.dayOfWeek && req.body.dayOfWeek !== currentTeach.dayOfWeek;
+    const startTimeChanged = req.body.startTime && req.body.startTime !== currentTeach.startTime;
+    const endTimeChanged = req.body.endTime && req.body.endTime !== currentTeach.endTime;
+
+    // If time slot is being changed, check for conflicts
+    if (teacherIdChanged || dayChanged || startTimeChanged || endTimeChanged) {
+      const updateTeacherId = req.body.teacherId || currentTeach.teacherId;
+      const updateDayOfWeek = req.body.dayOfWeek || currentTeach.dayOfWeek;
+      const updateStartTime = req.body.startTime || currentTeach.startTime;
+      const updateEndTime = req.body.endTime || currentTeach.endTime;
+
+      const conflict = await Teach.findOne({
+        _id: { $ne: req.params.id }, // Exclude current record
+        teacherId: updateTeacherId,
+        dayOfWeek: updateDayOfWeek,
+        startTime: updateStartTime,
+        endTime: updateEndTime,
+      });
+
+      if (conflict) {
+        return res.status(400).json({
+          success: false,
+          error: 'Thời gian dạy này đã bị trùng với phân công khác của cùng giáo viên',
+        });
+      }
+    }
+
+    // Validate fields
+    if (req.body.classType && !['fixed', 'session'].includes(req.body.classType)) {
+      return res.status(400).json({ success: false, error: 'Loại lớp không hợp lệ' });
+    }
+    if (
+      req.body.dayOfWeek &&
+      !['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'].includes(req.body.dayOfWeek)
+    ) {
+      return res.status(400).json({ success: false, error: 'Ngày trong tuần không hợp lệ' });
+    }
+    if (req.body.startTime && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(req.body.startTime)) {
+      return res.status(400).json({ success: false, error: 'Định dạng giờ bắt đầu không hợp lệ (HH:mm)' });
+    }
+    if (req.body.endTime && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(req.body.endTime)) {
+      return res.status(400).json({ success: false, error: 'Định dạng giờ kết thúc không hợp lệ (HH:mm)' });
+    }
+
     const teach = await Teach.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
-      runValidators: true,
+      runValidators: false, // We handle validation above
     })
       .populate('teacherId', 'name email')
       .populate('subjectId', 'name code');
 
-    if (!teach) {
-      return res.status(404).json({ success: false, error: 'Không tìm thấy phân công dạy' });
-    }
-
     // Transform data to convert _id to id
     const transformedTeach = {
       id: (teach as any)._id?.toString(),
-      teacherId: (teach as any).teacherId?._id?.toString() || (teach as any).teacherId,
-      subjectId: (teach as any).subjectId?._id?.toString() || (teach as any).subjectId,
+      teacherId: typeof (teach as any).teacherId === 'object' ? (teach as any).teacherId._id?.toString() : (teach as any).teacherId?.toString(),
+      subjectId: typeof (teach as any).subjectId === 'object' ? (teach as any).subjectId._id?.toString() : (teach as any).subjectId?.toString(),
       className: (teach as any).className,
       sessionClassId: (teach as any).sessionClassId?.toString(),
       classType: (teach as any).classType,
@@ -168,7 +216,8 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: transformedTeach, message: 'Cập nhật phân công dạy thành công' });
   } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('PUT /api/teaches/:id error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Lỗi cập nhật phân công dạy' });
   }
 });
 

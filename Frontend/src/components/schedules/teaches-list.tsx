@@ -39,7 +39,6 @@ export function TeachesList() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [allSubjects, setAllSubjects] = useState<typeof subjects>([]);
-  const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [formData, setFormData] = useState<Partial<Teach>>({
     teacherId: '',
     subjectId: '',
@@ -55,20 +54,25 @@ export function TeachesList() {
   useEffect(() => {
     const fetchAllSubjects = async () => {
       try {
-        setLoadingSubjects(true);
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-        const response = await fetch(`${apiUrl}/api/subjects?limit=999`);
+        const url = apiUrl.endsWith('/api') ? `${apiUrl}/subjects?limit=999` : `${apiUrl}/api/subjects?limit=999`;
+        console.log('🔍 Fetching all subjects from:', url);
+        const response = await fetch(url);
         if (response.ok) {
           const data = await response.json();
+          console.log('✅ Fetched subjects:', {
+            count: data.data?.length,
+            firstSubject: data.data?.[0],
+            lastSubject: data.data?.[data.data.length - 1],
+          });
           if (data.success && Array.isArray(data.data)) {
-            console.log('✅ Fetched all subjects:', data.data.length);
             setAllSubjects(data.data);
           }
+        } else {
+          console.error('❌ Failed to fetch subjects:', response.status);
         }
       } catch (err) {
-        console.error('Failed to fetch all subjects:', err);
-      } finally {
-        setLoadingSubjects(false);
+        console.error('❌ Failed to fetch all subjects:', err);
       }
     };
     fetchAllSubjects();
@@ -83,23 +87,18 @@ export function TeachesList() {
     fetchAll();
   }, [fetchAll]);
 
-  const handleOpen = (teach?: Teach) => {
-    if (teach) {
-      setFormData(teach);
-      setEditingId(teach.id);
-    } else {
-      setFormData({
-        teacherId: '',
-        subjectId: '',
-        className: '',
-        classType: 'fixed',
-        dayOfWeek: 'Thứ 2',
-        startTime: '08:00',
-        endTime: '10:00',
-        notes: '',
-      });
-      setEditingId(null);
-    }
+  const handleOpen = () => {
+    setFormData({
+      teacherId: '',
+      subjectId: '',
+      className: '',
+      classType: 'fixed',
+      dayOfWeek: 'Thứ 2',
+      startTime: '08:00',
+      endTime: '10:00',
+      notes: '',
+    });
+    setEditingId(null);
     setOpen(true);
   };
 
@@ -121,35 +120,34 @@ export function TeachesList() {
       }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const endpoint = apiUrl.endsWith('/api') ? `${apiUrl}/teaches` : `${apiUrl}/api/teaches`;
 
-      if (editingId) {
-        // Update
-        const response = await fetch(`${apiUrl}/api/teaches/${editingId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Lỗi cập nhật phân công dạy');
-        }
-      } else {
-        // Create
-        const response = await fetch(`${apiUrl}/api/teaches`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Lỗi tạo phân công dạy');
-        }
+      console.log('📤 Creating teach with data:', formData);
+      console.log('📤 Endpoint:', endpoint);
+
+      // Create
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      console.log('📡 Response status:', response.status);
+      
+      const responseData = await response.json();
+      console.log('📡 Response data:', responseData);
+
+      if (!response.ok) {
+        throw new Error(responseData.message || responseData.error || 'Lỗi tạo phân công dạy');
       }
 
+      console.log('✅ Teach created successfully');
       await fetchAll();
       handleClose();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Có lỗi xảy ra');
+      const errorMsg = err instanceof Error ? err.message : 'Có lỗi xảy ra';
+      console.error('❌ Error creating teach:', errorMsg);
+      setSubmitError(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -162,16 +160,30 @@ export function TeachesList() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/teaches/${id}`, {
+      const endpoint = apiUrl.endsWith('/api') ? `${apiUrl}/teaches/${id}` : `${apiUrl}/api/teaches/${id}`;
+
+      console.log('🗑️ Deleting teach with id:', id);
+      console.log('🗑️ Endpoint:', endpoint);
+
+      const response = await fetch(endpoint, {
         method: 'DELETE',
       });
+
+      console.log('📡 Delete response status:', response.status);
+      
+      const responseData = await response.json();
+      console.log('📡 Delete response data:', responseData);
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Lỗi xóa phân công dạy');
+        throw new Error(responseData.message || responseData.error || 'Lỗi xóa phân công dạy');
       }
+
+      console.log('✅ Teach deleted successfully');
       await fetchAll();
     } catch (err) {
-      alert('Lỗi xóa: ' + (err instanceof Error ? err.message : 'Có lỗi xảy ra'));
+      const errorMsg = err instanceof Error ? err.message : 'Có lỗi xảy ra';
+      console.error('❌ Error deleting teach:', errorMsg);
+      alert('Lỗi xóa: ' + errorMsg);
     }
   };
 
@@ -249,6 +261,16 @@ export function TeachesList() {
                 const teacher = teachers.find(t => String(t.id) === String(teach.teacherId));
                 const subjectsToUse = allSubjects.length > 0 ? allSubjects : subjects;
                 const subject = subjectsToUse.find(s => String(s.id) === String(teach.subjectId));
+                
+                // Debug - log first record
+                if (teach === filteredTeaches[0]) {
+                  console.log('🔍 TeachesList DEBUG - First Teach:', teach);
+                  console.log('🔍 TeachesList DEBUG - Teach SubjectId:', teach.subjectId);
+                  console.log('🔍 TeachesList DEBUG - All Subjects Loaded:', allSubjects.length);
+                  console.log('🔍 TeachesList DEBUG - First Subject from API:', allSubjects[0]);
+                  console.log('🔍 TeachesList DEBUG - Found Subject Match:', subject);
+                  console.log('🔍 TeachesList DEBUG - Subject Hook Length:', subjects.length);
+                }
 
                 return (
                   <TableRow key={teach.id} hover>
@@ -268,14 +290,6 @@ export function TeachesList() {
                     <TableCell sx={{ textAlign: 'center' }}>
                       <Button
                         size="small"
-                        onClick={() => handleOpen(teach)}
-                        color="primary"
-                        sx={{ mr: 1 }}
-                      >
-                        Sửa
-                      </Button>
-                      <Button
-                        size="small"
                         onClick={() => teach.id && handleDelete(teach.id)}
                         color="error"
                       >
@@ -291,9 +305,7 @@ export function TeachesList() {
       )}
 
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingId ? 'Sửa phân công dạy' : 'Thêm phân công dạy'}
-        </DialogTitle>
+        <DialogTitle>Thêm phân công dạy</DialogTitle>
         <DialogContent sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {submitError && <Alert severity="error">{submitError}</Alert>}
           <FormControl fullWidth>
@@ -395,7 +407,7 @@ export function TeachesList() {
             variant="contained"
             disabled={submitting}
           >
-            {submitting ? 'Đang xử lý...' : editingId ? 'Cập nhật' : 'Tạo'}
+            {submitting ? 'Đang xử lý...' : 'Tạo'}
           </Button>
         </DialogActions>
       </Dialog>

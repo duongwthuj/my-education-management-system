@@ -79,7 +79,7 @@ export function TeacherDetail({ teacherId }: TeacherDetailProps) {
   const [loadingEditDialogSubjects, setLoadingEditDialogSubjects] = useState(false);
   const { teacher: teacherData, loading, error, refetch } = useTeacher(teacherId);
   const { subjects, loading: loadingSubjects } = useSubjects();
-  const { teaches, loading: loadingTeaches } = useTeaches();
+  const { teaches, loading: loadingTeaches, fetchByTeacher, fetchAll: fetchAllTeaches } = useTeaches();
 
   // Fetch tất cả subjects khi component mount
   useEffect(() => {
@@ -548,7 +548,10 @@ export function TeacherDetail({ teacherId }: TeacherDetailProps) {
                                                       method: 'DELETE',
                                                     });
                                                     if (response.ok) {
-                                                      refetch();
+                                                      // Refetch teaches for this teacher
+                                                      if (teacher?.id) {
+                                                        await fetchByTeacher(teacher.id);
+                                                      }
                                                     } else {
                                                       alert('Xóa thất bại');
                                                     }
@@ -817,18 +820,31 @@ export function TeacherDetail({ teacherId }: TeacherDetailProps) {
           </Button>
           <Button 
             onClick={async () => {
-              if (!editTeachForm.subjectId || !editTeachForm.className || !editTeachForm.startTime || !editTeachForm.endTime) {
-                setEditingTeachError('Vui lòng điền đầy đủ thông tin');
+              console.log('🔘 Save button clicked', { editTeachForm, editingTeach });
+              if (!editTeachForm.subjectId || !editTeachForm.className || !editTeachForm.startTime || !editTeachForm.endTime || !editTeachForm.dayOfWeek) {
+                setEditingTeachError('Vui lòng điền đầy đủ thông tin (bao gồm ngày trong tuần)');
                 return;
               }
               try {
                 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
                 const endpoint = apiUrl.endsWith('/api') ? `${apiUrl}/teaches/${editingTeach.id}` : `${apiUrl}/api/teaches/${editingTeach.id}`;
-                console.log('📤 Saving teach schedule:', { endpoint, data: editTeachForm });
+                
+                // Chuẩn bị data đầy đủ
+                const updateData = {
+                  subjectId: editTeachForm.subjectId,
+                  className: editTeachForm.className,
+                  startTime: editTeachForm.startTime,
+                  endTime: editTeachForm.endTime,
+                  dayOfWeek: editTeachForm.dayOfWeek,
+                  classType: editTeachForm.classType || 'fixed',
+                  notes: editTeachForm.notes || '',
+                };
+                
+                console.log('📤 Saving teach schedule:', { endpoint, data: updateData });
                 const response = await fetch(endpoint, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(editTeachForm),
+                  body: JSON.stringify(updateData),
                 });
                 console.log('📡 Response status:', response.status);
                 if (response.ok) {
@@ -838,11 +854,14 @@ export function TeacherDetail({ teacherId }: TeacherDetailProps) {
                   setEditingTeach(null);
                   setEditTeachForm(null);
                   setEditingTeachError(null);
-                  refetch();
+                  // Refetch teaches for this teacher
+                  if (teacher?.id) {
+                    await fetchByTeacher(teacher.id);
+                  }
                 } else {
                   const errorData = await response.json();
                   console.error('❌ Save failed:', errorData);
-                  setEditingTeachError(errorData.message || 'Cập nhật thất bại');
+                  setEditingTeachError(errorData.message || errorData.error || 'Cập nhật thất bại');
                 }
               } catch (err) {
                 console.error('❌ Error saving:', err);

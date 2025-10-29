@@ -27,9 +27,15 @@ router.get('/', async (req: Request, res: Response) => {
       Subject.countDocuments(query),
     ]);
 
+    // Transform _id to id
+    const transformedSubjects = subjects.map((subject: any) => ({
+      ...subject,
+      id: subject._id?.toString(),
+    }));
+
     res.json({
       success: true,
-      data: subjects,
+      data: transformedSubjects,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -49,7 +55,12 @@ router.get('/:id', async (req: Request, res: Response) => {
     if (!subject) {
       return res.status(404).json({ success: false, error: 'Không tìm thấy môn học' });
     }
-    res.json({ success: true, data: subject });
+    // Transform _id to id
+    const transformed = {
+      ...subject,
+      id: (subject as any)._id?.toString(),
+    };
+    res.json({ success: true, data: transformed });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -78,7 +89,12 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (!subject) {
       return res.status(404).json({ success: false, error: 'Không tìm thấy môn học' });
     }
-    res.json({ success: true, data: subject, message: 'Cập nhật môn học thành công' });
+    // Transform _id to id
+    const transformed = {
+      ...subject,
+      id: (subject as any)._id?.toString(),
+    };
+    res.json({ success: true, data: transformed, message: 'Cập nhật môn học thành công' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

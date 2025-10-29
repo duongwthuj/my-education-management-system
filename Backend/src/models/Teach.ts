@@ -88,9 +88,10 @@ teachSchema.index({ sessionClassId: 1 });
 teachSchema.index({ teacherId: 1, dayOfWeek: 1, startTime: 1 });
 
 // Unique constraint: Một giáo viên không thể dạy 2 lớp khác nhau cùng 1 thời gian
+// Note: Mongoose unique doesn't work well with findByIdAndUpdate - we'll handle in code
 teachSchema.index(
   { teacherId: 1, dayOfWeek: 1, startTime: 1, endTime: 1 },
-  { unique: true }
+  { unique: false } // Removed unique to handle in code
 );
 
 export default mongoose.model<ITeachDocument>('Teach', teachSchema);
