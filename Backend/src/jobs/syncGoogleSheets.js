@@ -34,15 +34,22 @@ export const syncAndImportOffsetClasses = async () => {
                 const senderEmail = emailMatch ? emailMatch[1] : item.sender;
                 
                 // ✅ CHECK EMAIL ĐÃ ĐƯỢC IMPORT CHƯA (mỗi email = 1 học sinh)
-                // Nếu email này đã được xử lý → Skip toàn bộ
-                const emailAlreadyProcessed = await OffsetClass.findOne({
-                    studentEmail: senderEmail,
-                    className: ma_lop,
-                    emailSentTime: item.sentTime
+                // Check bằng email + className + scheduled dates
+                // Lấy tất cả scheduled dates từ cac_buoi
+                const scheduledDates = cac_buoi.map(buoi => {
+                    const [day, month, year] = buoi.ngay.split('/');
+                    return new Date(year, month - 1, day);
                 });
                 
-                if (emailAlreadyProcessed) {
-                    console.log(`⏩ [Sync Job] Email from ${senderEmail} already processed, skipping...`);
+                // Check xem đã tồn tại offset classes với cùng email, className và bất kỳ scheduled date nào
+                const existingClasses = await OffsetClass.find({
+                    studentEmail: senderEmail,
+                    className: ma_lop,
+                    scheduledDate: { $in: scheduledDates }
+                });
+                
+                if (existingClasses.length > 0) {
+                    console.log(`⏩ [Sync Job] Email from ${senderEmail} already processed for ${ma_lop} on ${existingClasses.length} date(s), skipping...`);
                     skippedCount++;
                     continue;
                 }
@@ -161,8 +168,8 @@ export const startSyncJob = () => {
     // Chạy ngay lập tức
     syncAndImportOffsetClasses();
     
-    // Chạy mỗi 30 giây
+    // Chạy mỗi 15 phút (900000ms)
     setInterval(() => {
         syncAndImportOffsetClasses();
-    }, 30000); // 30 seconds
+    }, 900000); // 15 minutes
 };

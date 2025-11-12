@@ -28,7 +28,9 @@ const TeacherDetails = () => {
     startTime: '08:00',
     endTime: '10:00',
     meetingLink: '',
-    notes: ''
+    notes: '',
+    startDate: '', // Ngày bắt đầu (bắt buộc)
+    endDate: '' // Ngày kết thúc (không bắt buộc)
   });
 
   useEffect(() => {
@@ -162,7 +164,9 @@ const TeacherDetails = () => {
         startTime: '08:00',
         endTime: '10:00',
         meetingLink: '',
-        notes: ''
+        notes: '',
+        startDate: '',
+        endDate: ''
       });
       setEditingSchedule(null);
       loadData();
@@ -180,7 +184,9 @@ const TeacherDetails = () => {
       startTime: schedule.startTime,
       endTime: schedule.endTime,
       meetingLink: schedule.meetingLink || '',
-      notes: schedule.notes || ''
+      notes: schedule.notes || '',
+      startDate: schedule.startDate ? schedule.startDate.split('T')[0] : '',
+      endDate: schedule.endDate ? schedule.endDate.split('T')[0] : ''
     });
     setShowScheduleModal(true);
   };
@@ -855,6 +861,36 @@ const TeacherDetails = () => {
                   </div>
                 </div>
 
+                {/* Date Range */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Ngày bắt đầu <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={scheduleForm.startDate}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, startDate: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Lịch cố định có hiệu lực từ ngày này</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Ngày kết thúc
+                    </label>
+                    <input
+                      type="date"
+                      value={scheduleForm.endDate}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, endDate: e.target.value })}
+                      min={scheduleForm.startDate}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Để trống nếu không có ngày kết thúc</p>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Link meeting (Zoom, Google Meet...)
@@ -895,7 +931,9 @@ const TeacherDetails = () => {
                       startTime: '08:00',
                       endTime: '10:00',
                       meetingLink: '',
-                      notes: ''
+                      notes: '',
+                      startDate: '',
+                      endDate: ''
                     });
                   }}
                   className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50"

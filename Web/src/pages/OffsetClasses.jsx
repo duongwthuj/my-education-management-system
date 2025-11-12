@@ -60,13 +60,14 @@ const OffsetClasses = () => {
   }, [filterStatus, filterDateFrom, filterDateTo, showAll]);
 
   // Auto refresh mỗi 30 giây để cập nhật offset classes mới từ DB
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadData();
-    }, 30000); // 30 seconds
+  // DISABLED: Gây conflict với filter
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     loadData();
+  //   }, 30000); // 30 seconds
 
-    return () => clearInterval(interval);
-  }, []);
+  //   return () => clearInterval(interval);
+  // }, []);
 
   const loadData = async () => {
     try {
@@ -90,6 +91,8 @@ const OffsetClasses = () => {
         params.limit = 50; // Giới hạn 50 items khi phân trang
       }
       
+      console.log('🔍 Loading offset classes with params:', params);
+      
       const [offsetRes, teachersRes, subjectsRes, levelsRes] = await Promise.all([
         offsetClassesAPI.getAll(params),
         teachersAPI.getAll(),
@@ -97,6 +100,7 @@ const OffsetClasses = () => {
         subjectsAPI.getAllLevels(),
       ]);
 
+      console.log('✅ Loaded offset classes:', offsetRes.data?.length, 'items');
       setOffsetClasses(offsetRes.data || []);
       setTeachers(teachersRes.data || []);
       setSubjects(subjectsRes.data || []);

@@ -118,8 +118,22 @@ export const getTeachingHoursStats = async (req, res) => {
       let fixedHours = 0;
       for (const schedule of fixedSchedules) {
         const hoursPerClass = calculateHours(schedule.startTime, schedule.endTime);
-        const totalOccurrences = countDaysOfWeekInRange(startDate, endDate, schedule.dayOfWeek);
-        const leaveOccurrences = await countLeaveDaysInRange(teacher._id, startDate, endDate, schedule.dayOfWeek, schedule._id);
+        
+        // Tính intersection của schedule date range với requested range
+        const scheduleStart = schedule.startDate ? new Date(schedule.startDate) : new Date(startDate);
+        const scheduleEnd = schedule.endDate ? new Date(schedule.endDate) : new Date(endDate);
+        const rangeStart = new Date(startDate);
+        const rangeEnd = new Date(endDate);
+        
+        // Lấy overlap period
+        const effectiveStart = scheduleStart > rangeStart ? scheduleStart : rangeStart;
+        const effectiveEnd = scheduleEnd < rangeEnd ? scheduleEnd : rangeEnd;
+        
+        // Nếu không có overlap thì skip
+        if (effectiveStart > effectiveEnd) continue;
+        
+        const totalOccurrences = countDaysOfWeekInRange(effectiveStart, effectiveEnd, schedule.dayOfWeek);
+        const leaveOccurrences = await countLeaveDaysInRange(teacher._id, effectiveStart, effectiveEnd, schedule.dayOfWeek, schedule._id);
         const actualOccurrences = totalOccurrences - leaveOccurrences;
         fixedHours += hoursPerClass * actualOccurrences;
       }
@@ -198,8 +212,22 @@ export const getTeacherHoursDetail = async (req, res) => {
     const fixedScheduleDetails = [];
     for (const schedule of fixedSchedules) {
       const hoursPerClass = calculateHours(schedule.startTime, schedule.endTime);
-      const totalOccurrences = countDaysOfWeekInRange(startDate, endDate, schedule.dayOfWeek);
-      const leaveOccurrences = await countLeaveDaysInRange(teacherId, startDate, endDate, schedule.dayOfWeek, schedule._id);
+      
+      // Tính intersection của schedule date range với requested range
+      const scheduleStart = schedule.startDate ? new Date(schedule.startDate) : new Date(startDate);
+      const scheduleEnd = schedule.endDate ? new Date(schedule.endDate) : new Date(endDate);
+      const rangeStart = new Date(startDate);
+      const rangeEnd = new Date(endDate);
+      
+      // Lấy overlap period
+      const effectiveStart = scheduleStart > rangeStart ? scheduleStart : rangeStart;
+      const effectiveEnd = scheduleEnd < rangeEnd ? scheduleEnd : rangeEnd;
+      
+      // Nếu không có overlap thì skip
+      if (effectiveStart > effectiveEnd) continue;
+      
+      const totalOccurrences = countDaysOfWeekInRange(effectiveStart, effectiveEnd, schedule.dayOfWeek);
+      const leaveOccurrences = await countLeaveDaysInRange(teacherId, effectiveStart, effectiveEnd, schedule.dayOfWeek, schedule._id);
       const occurrences = totalOccurrences - leaveOccurrences;
       const totalHours = hoursPerClass * occurrences;
 
@@ -208,6 +236,8 @@ export const getTeacherHoursDetail = async (req, res) => {
         subject: schedule.subjectId?.name || 'N/A',
         dayOfWeek: schedule.dayOfWeek,
         timeSlot: `${schedule.startTime} - ${schedule.endTime}`,
+        startDate: schedule.startDate || 'N/A',
+        endDate: schedule.endDate || 'Không giới hạn',
         hoursPerClass,
         occurrences,
         leaveOccurrences,

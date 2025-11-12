@@ -28,6 +28,8 @@ const Schedule = () => {
     startTime: '',
     endTime: '',
     dayOfWeek: '',
+    startDate: '', // Ngày bắt đầu (bắt buộc)
+    endDate: '', // Ngày kết thúc (không bắt buộc)
   });
   
   // Form data cho Offset Class
@@ -66,13 +68,13 @@ const Schedule = () => {
   const loadData = async () => {
     try {
       const [shiftsRes, workShiftsRes, teachersRes, leavesRes, offsetClassesRes, subjectsRes, subjectLevelsRes] = await Promise.all([
-        scheduleAPI.getAllShifts(),
-        scheduleAPI.getWorkShifts(),
-        teachersAPI.getAll(),
-        fixedScheduleLeaveAPI.getAll(),
-        offsetClassesAPI.getAll({ limit: 1000 }), // Lấy tất cả offset classes (tăng limit)
-        subjectsAPI.getAll(), // Lấy danh sách môn học
-        subjectsAPI.getAllLevels() // Lấy tất cả học phần
+        scheduleAPI.getAllShifts().catch(err => { console.error('Error loading shifts:', err); return { data: [] }; }),
+        scheduleAPI.getWorkShifts().catch(err => { console.error('Error loading work shifts:', err); return { data: [] }; }),
+        teachersAPI.getAll().catch(err => { console.error('Error loading teachers:', err); return { data: [] }; }),
+        fixedScheduleLeaveAPI.getAll().catch(err => { console.error('Error loading leaves:', err); return { data: [] }; }),
+        offsetClassesAPI.getAll({ limit: 1000 }).catch(err => { console.error('Error loading offset classes:', err); return { data: [] }; }), // Lấy tất cả offset classes (tăng limit)
+        subjectsAPI.getAll().catch(err => { console.error('Error loading subjects:', err); return { data: [] }; }), // Lấy danh sách môn học
+        subjectsAPI.getAllLevels().catch(err => { console.error('Error loading subject levels:', err); return { data: [] }; }) // Lấy tất cả học phần
       ]);
       
       // API returns { success, data } after interceptor
@@ -323,6 +325,8 @@ const Schedule = () => {
         startTime: fixedScheduleFormData.startTime,
         endTime: fixedScheduleFormData.endTime,
         dayOfWeek: dayOfWeekName,
+        startDate: fixedScheduleFormData.startDate, // Thêm startDate
+        endDate: fixedScheduleFormData.endDate || undefined, // Thêm endDate (optional)
       });
       
       // Reset form
@@ -334,6 +338,8 @@ const Schedule = () => {
         startTime: '',
         endTime: '',
         dayOfWeek: '',
+        startDate: '',
+        endDate: '',
       });
       
       alert('✅ Đã thêm lịch cố định thành công!');
@@ -587,9 +593,24 @@ const Schedule = () => {
     const shiftStartMinutes = timeToMinutes(shift.startTime);
     const shiftEndMinutes = timeToMinutes(shift.endTime);
     
+    // Parse date để so sánh
+    const currentDate = new Date(date);
+    
     const schedulesInShift = teacher.fixedSchedules.filter(fs => {
       const fsDay = fs.dayOfWeek;
       if (fsDay !== dayName) return false;
+      
+      // Check startDate - nếu có startDate thì ngày hiện tại phải >= startDate
+      if (fs.startDate) {
+        const scheduleStartDate = new Date(fs.startDate);
+        if (currentDate < scheduleStartDate) return false;
+      }
+      
+      // Check endDate - nếu có endDate thì ngày hiện tại phải <= endDate
+      if (fs.endDate) {
+        const scheduleEndDate = new Date(fs.endDate);
+        if (currentDate > scheduleEndDate) return false;
+      }
       
       // Only include if schedule STARTS in this shift
       const fsStartMinutes = timeToMinutes(fs.startTime);
@@ -967,9 +988,13 @@ const Schedule = () => {
                               // 2. Thêm Fixed Schedules
                               if (fixedSchedules && fixedSchedules.length > 0) {
                                 fixedSchedules.forEach((fs, idx) => {
+                                  // Skip if fs is null or undefined
+                                  if (!fs || !fs._id) return;
+                                  
                                   const isOnLeave = fixedScheduleLeaves.some(leave => {
+                                    if (!leave || !leave.fixedScheduleId) return false;
                                     const leaveScheduleId = typeof leave.fixedScheduleId === 'object' 
-                                      ? leave.fixedScheduleId._id 
+                                      ? leave.fixedScheduleId?._id 
                                       : leave.fixedScheduleId;
                                     const leaveDate = new Date(leave.date).toISOString().split('T')[0];
                                     return leaveScheduleId === fs._id && leaveDate === date;
@@ -1722,6 +1747,36 @@ const Schedule = () => {
                     </select>
                   </div>
                 </div>
+
+                {/* Date Range */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Ngày bắt đầu <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={fixedScheduleFormData.startDate}
+                      onChange={(e) => setFixedScheduleFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Lịch cố định có hiệu lực từ ngày này</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Ngày kết thúc
+                    </label>
+                    <input
+                      type="date"
+                      value={fixedScheduleFormData.endDate}
+                      onChange={(e) => setFixedScheduleFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                      min={fixedScheduleFormData.startDate}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Để trống nếu không có ngày kết thúc</p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-3 mt-6">
@@ -1731,9 +1786,12 @@ const Schedule = () => {
                     setShowFixedScheduleForm(false);
                     setFixedScheduleFormData({
                       subjectId: '',
+                      className: '',
                       startTime: '',
                       endTime: '',
                       dayOfWeek: '',
+                      startDate: '',
+                      endDate: '',
                     });
                   }}
                   className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50"

@@ -37,6 +37,14 @@ const fixedScheduleSchema = new Schema(
         meetingLink: {
             type: String // Link Zoom, Google Meet, etc.
         },
+        startDate: {
+            type: Date, // Ngày bắt đầu lịch cố định (không bắt buộc)
+            required: false
+        },
+        endDate: {
+            type: Date, // Ngày kết thúc lịch cố định (không bắt buộc)
+            required: false
+        },
         isActive: {
             type: Boolean,
             default: true
