@@ -68,7 +68,7 @@ function main() {
   const sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
 
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["Người gửi", "Thời gian gửi", "JSON dữ liệu", "Kết quả phản hồi"]);
+    sheet.appendRow(["Người gửi", "Thời gian gửi", "JSON dữ liệu", "Link Offset", "Kết quả phản hồi"]);
   }
 
   const scriptProps = PropertiesService.getScriptProperties();
@@ -114,7 +114,7 @@ function main() {
 
     const data = extractOffsetData(body);
     if (!data || !data.cac_buoi?.length || !data.subjectCode) {
-      sheet.appendRow([sender, sentTime, "❌ Không trích xuất được dữ liệu", "Không phản hồi"]);
+      sheet.appendRow([sender, sentTime, "❌ Không trích xuất được dữ liệu", "", "Không phản hồi"]);
       if (!processedIds.includes(msgId)) {
         processedIds.push(msgId);
       }
@@ -123,8 +123,9 @@ function main() {
       continue;
     }
 
-    // Ghi JSON ra sheet
-    sheet.appendRow([sender, sentTime, JSON.stringify(data, null, 2), "⏳ Đang xử lý"]);
+    // Ghi JSON ra sheet - tách link_offset ra cột riêng
+    const linkOffset = data.link_offset || "";
+    sheet.appendRow([sender, sentTime, JSON.stringify(data, null, 2), linkOffset, "⏳ Đang xử lý"]);
     newMailCount++;
 
     const buoiDau = data.cac_buoi[0];
@@ -135,7 +136,7 @@ function main() {
     if (!dateTimeHoc || isNaN(dateTimeHoc.getTime())) {
       Logger.log("⚠️ Không tính được thời gian học");
       const lastRow = sheet.getLastRow();
-      sheet.getRange(lastRow, 4).setValue("⚠️ Lỗi thời gian");
+      sheet.getRange(lastRow, 5).setValue("⚠️ Lỗi thời gian");
       if (!processedIds.includes(msgId)) {
         processedIds.push(msgId);
       }
@@ -168,7 +169,7 @@ function main() {
     thread.addLabel(label);
 
     const lastRow = sheet.getLastRow();
-    sheet.getRange(lastRow, 4).setValue(result);
+    sheet.getRange(lastRow, 5).setValue(result);
 
     // 🔒 Đánh dấu đã xử lý và lưu ngay (tránh trùng lặp)
     if (!processedIds.includes(msgId)) {
@@ -487,11 +488,12 @@ function syncAllDataToSheet() {
       const data = extractOffsetData(body);
       
       if (data && data.cac_buoi?.length && data.subjectCode) {
-        sheet.appendRow([sender, sentTime, JSON.stringify(data, null, 2), "✅ Đồng bộ lại"]);
+        const linkOffset = data.link_offset || "";
+        sheet.appendRow([sender, sentTime, JSON.stringify(data, null, 2), linkOffset, "✅ Đồng bộ lại"]);
         syncCount++;
         Logger.log(`✅ Đã đồng bộ mail: ${msg.getSubject()}`);
       } else {
-        sheet.appendRow([sender, sentTime, "❌ Không parse được khi đồng bộ", "Lỗi"]);
+        sheet.appendRow([sender, sentTime, "❌ Không parse được khi đồng bộ", "", "Lỗi"]);
         Logger.log(`⚠️ Không parse được mail: ${msg.getSubject()}`);
       }
     }
@@ -521,17 +523,18 @@ function replyWithTeacherAssignment() {
   }
   
   // Đọc tất cả data từ sheet
-  const data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
-  // Cột: A=Người gửi, B=Thời gian, C=JSON, D=Kết quả, E=Giáo viên, F=Email
+  const data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+  // Cột: A=Người gửi, B=Thời gian, C=JSON, D=Link Offset, E=Kết quả, F=Giáo viên, G=Email
   
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
     const sender = row[0];
     const sentTime = row[1];
     const jsonData = row[2];
-    const result = row[3];
-    const teachers = row[4];
-    const emails = row[5];
+    const linkOffset = row[3];
+    const result = row[4];
+    const teachers = row[5];
+    const emails = row[6];
     
     // Bỏ qua nếu không có JSON hoặc chưa parse được
     if (!jsonData || typeof jsonData !== 'string' || !jsonData.startsWith('{')) continue;
@@ -568,7 +571,7 @@ function replyWithTeacherAssignment() {
         continue;
       }
       
-      // Kiểm tra xem đã reply chưa (cột D có chứa "✅ Đã gửi GV")
+      // Kiểm tra xem đã reply chưa (cột E có chứa "✅ Đã gửi GV")
       if (result && result.includes("✅ Đã gửi GV")) {
         Logger.log(`⏭️ Row ${i + 2}: Đã reply giáo viên rồi, bỏ qua`);
         continue;
@@ -625,12 +628,10 @@ function replyWithTeacherAssignment() {
           }
         });
         
-        teacherList += `<div style="font-size: 16px; margin: 8px 0;"><b>- Buổi ${j + 1}: Ngày ${buoi.ngay} (${buoi.gio_bat_dau} - ${buoi.gio_ket_thuc}) - Giáo viên: ${teacherName}</b></div>`;
+        teacherList += `<p style="font-size: 16px; margin: 8px 0; font-weight: bold;">- Buổi ${j + 1}: Ngày ${buoi.ngay} (${buoi.gio_bat_dau} - ${buoi.gio_ket_thuc}) - Giáo viên: ${teacherName}</p>`;
       }
       
-      const body = `
-<div style="font-size: 14px; line-height: 1.6;">
-<p>Dear all,</p>
+      const body = `<p>Dear all,</p>
 
 <p>Bộ phận chuyên môn nhận thông tin và hỗ trợ sắp xếp giáo viên như sau:</p>
 
@@ -638,13 +639,10 @@ ${teacherList}
 
 <p>Các giáo viên đã được CC vào mail này. Vui lòng kiểm tra lịch và chuẩn bị bài giảng.</p>
 
-<br>
 <p>Trân trọng,<br>
-Dương Thụ - [ST - Edtech]</p>
-</div>
-`;
+Dương Thụ - [ST - Edtech]</p>`;
       
-      // Reply all và CC các giáo viên
+      // Reply all và CC các giáo viên mới
       const firstMsg = foundThread.getMessages()[0];
       const ccList = teacherEmails.join(',');
       
@@ -654,8 +652,8 @@ Dương Thụ - [ST - Edtech]</p>
       
       Logger.log(`✅ Row ${i + 2}: Đã reply và CC ${teacherEmails.length} giáo viên cho lớp ${maLop}`);
       
-      // Cập nhật cột D để đánh dấu đã reply
-      sheet.getRange(i + 2, 4).setValue("✅ Đã gửi GV: " + new Date().toLocaleString('vi-VN'));
+      // Cập nhật cột E để đánh dấu đã reply
+      sheet.getRange(i + 2, 5).setValue("✅ Đã gửi GV: " + new Date().toLocaleString('vi-VN'));
       
     } catch (err) {
       Logger.log(`❌ Row ${i + 2}: Lỗi xử lý - ${err.message}`);
@@ -680,7 +678,7 @@ function checkAndReplyForClass(className) {
   const lastRow = sheet.getLastRow();
   if (lastRow <= 1) return;
   
-  const data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+  const data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
   
   for (let i = 0; i < data.length; i++) {
     const row = data[i];

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import { Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -12,9 +12,20 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { Users, BookMarked, Calendar, TrendingUp, Filter } from 'lucide-react';
+import { 
+  Users, 
+  BookMarked, 
+  Calendar, 
+  TrendingUp, 
+  Filter, 
+  Clock, 
+  CheckCircle, 
+  AlertCircle 
+} from 'lucide-react';
 import { dashboardAPI, teachersAPI } from '../services/api';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
 
 ChartJS.register(
   CategoryScale,
@@ -27,6 +38,35 @@ ChartJS.register(
   Tooltip,
   Legend
 );
+
+const StatsCard = ({ title, value, icon: Icon, color, trend }) => {
+  const colorStyles = {
+    blue: 'bg-blue-50 text-blue-600',
+    green: 'bg-green-50 text-green-600',
+    red: 'bg-red-50 text-red-600',
+    purple: 'bg-purple-50 text-purple-600',
+    indigo: 'bg-indigo-50 text-indigo-600',
+  };
+
+  return (
+    <Card className="hover:shadow-lg transition-shadow duration-200">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-medium text-secondary-500">{title}</p>
+          <h3 className="text-2xl font-bold text-secondary-900 mt-2">{value}</h3>
+          {trend && (
+            <p className={`text-xs font-medium mt-1 ${trend > 0 ? 'text-success-600' : 'text-danger-600'}`}>
+              {trend > 0 ? '+' : ''}{trend}% so với tháng trước
+            </p>
+          )}
+        </div>
+        <div className={`p-3 rounded-xl ${colorStyles[color] || colorStyles.blue}`}>
+          <Icon className="w-6 h-6" />
+        </div>
+      </div>
+    </Card>
+  );
+};
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -56,20 +96,16 @@ const Dashboard = () => {
 
       // Load teachers
       const teachersRes = await teachersAPI.getAll();
-      console.log('Teachers response:', teachersRes);
-      // API interceptor already unwraps response.data
       const teachersData = teachersRes.data || teachersRes || [];
       setTeachers(Array.isArray(teachersData) ? teachersData : []);
 
-      // Load teaching hours statistics from new API
+      // Load teaching hours statistics
       const teachingHoursRes = await dashboardAPI.getTeachingHours({
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
         teacherId: selectedTeacher !== 'all' ? selectedTeacher : undefined
       });
-      console.log('Teaching hours response:', teachingHoursRes);
 
-      // API interceptor returns { success: true, data: ..., summary: ... }
       const teacherStats = teachingHoursRes.data || [];
       const summary = teachingHoursRes.summary || {};
 
@@ -79,9 +115,7 @@ const Dashboard = () => {
         endDate: dateRange.endDate,
         teacherId: selectedTeacher !== 'all' ? selectedTeacher : undefined
       });
-      console.log('Offset stats response:', offsetStatsRes);
 
-      // API returns { success: true, data: { total, pending, assigned, completed, ... } }
       const offsetStats = offsetStatsRes.data || {};
 
       // Update stats
@@ -107,136 +141,130 @@ const Dashboard = () => {
       setLoading(false);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-      console.error('Error details:', error.response || error.message);
-      
-      // Set default values on error
-      setStats({
-        totalTeachers: 0,
-        totalOffsetClasses: 0,
-        pendingClasses: 0,
-        assignedClasses: 0,
-        completedClasses: 0,
-      });
-      setOffsetData([]);
-      setTeacherHoursData([]);
-      
       setLoading(false);
     }
   };
 
-  const parseTime = (timeStr) => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const date = new Date();
-    date.setHours(hours, minutes, 0, 0);
-    return date;
+  // Chart Configuration
+  const chartTheme = {
+    primary: '#6366f1', // Indigo 500
+    secondary: '#a5b4fc', // Indigo 300
+    success: '#22c55e', // Green 500
+    warning: '#eab308', // Yellow 500
+    danger: '#ef4444', // Red 500
+    grid: '#e2e8f0', // Slate 200
+    text: '#64748b', // Slate 500
   };
 
-  // Chart data for offset classes by teacher
+  const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: {
+          usePointStyle: true,
+          font: { family: 'Inter', size: 12 },
+          color: chartTheme.text,
+        },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+        titleFont: { family: 'Inter', size: 13 },
+        bodyFont: { family: 'Inter', size: 12 },
+        padding: 10,
+        cornerRadius: 8,
+        displayColors: false,
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: chartTheme.text, font: { family: 'Inter' } },
+      },
+      y: {
+        grid: { color: chartTheme.grid, borderDash: [4, 4] },
+        ticks: { color: chartTheme.text, font: { family: 'Inter' } },
+        beginAtZero: true,
+      },
+    },
+  };
+
   const offsetClassesChartData = {
     labels: offsetData.map(([name]) => name),
     datasets: [
       {
         label: 'Số lớp offset',
         data: offsetData.map(([, count]) => count),
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        borderColor: 'rgba(59, 130, 246, 1)',
-        borderWidth: 1,
+        backgroundColor: chartTheme.primary,
+        borderRadius: 6,
+        barThickness: 20,
       },
     ],
   };
 
-  // Chart data for teaching hours by teacher
   const teachingHoursChartData = {
     labels: teacherHoursData.map(([name]) => name),
     datasets: [
       {
         label: 'Số giờ dạy',
         data: teacherHoursData.map(([, hours]) => hours.toFixed(1)),
-        backgroundColor: 'rgba(16, 185, 129, 0.8)',
-        borderColor: 'rgba(16, 185, 129, 1)',
-        borderWidth: 1,
+        backgroundColor: chartTheme.success,
+        borderRadius: 6,
+        barThickness: 20,
       },
     ],
   };
 
-  // Status distribution chart
   const statusChartData = {
     labels: ['Chưa có GV', 'Đã phân công', 'Hoàn thành'],
     datasets: [
       {
         data: [stats.pendingClasses, stats.assignedClasses, stats.completedClasses],
-        backgroundColor: [
-          'rgba(239, 68, 68, 0.8)',  // Red for pending
-          'rgba(59, 130, 246, 0.8)',  // Blue for assigned
-          'rgba(34, 197, 94, 0.8)'    // Green for completed
-        ],
-        borderColor: [
-          'rgba(239, 68, 68, 1)',
-          'rgba(59, 130, 246, 1)',
-          'rgba(34, 197, 94, 1)'
-        ],
-        borderWidth: 1,
+        backgroundColor: [chartTheme.danger, chartTheme.primary, chartTheme.success],
+        borderWidth: 0,
+        hoverOffset: 4,
       },
     ],
   };
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top',
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-      },
-    },
-  };
-
-  const doughnutOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'bottom',
-      },
-    },
-  };
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Đang tải dữ liệu...</p>
-        </div>
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-        <p className="text-gray-600 mt-2">Tổng quan hệ thống quản lý giảng dạy</p>
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-secondary-900">Dashboard</h1>
+          <p className="text-secondary-500 mt-1">Tổng quan hoạt động hệ thống</p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" className="hidden md:flex">
+            <Clock className="w-4 h-4 mr-2" />
+            Cập nhật: {format(new Date(), 'HH:mm')}
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Filter className="w-5 h-5 text-gray-500" />
-            <span className="font-medium text-gray-700">Bộ lọc:</span>
+      <Card className="p-4">
+        <div className="flex flex-col md:flex-row items-center gap-4">
+          <div className="flex items-center gap-2 text-secondary-700 min-w-max">
+            <Filter className="w-5 h-5" />
+            <span className="font-medium">Bộ lọc:</span>
           </div>
 
-          <div>
-            <label className="text-sm text-gray-600 mr-2">Giáo viên:</label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
             <select
               value={selectedTeacher}
               onChange={(e) => setSelectedTeacher(e.target.value)}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-primary-500"
+              className="w-full px-4 py-2 bg-secondary-50 border border-secondary-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
             >
               <option value="all">Tất cả giáo viên</option>
               {teachers.map((teacher) => (
@@ -245,122 +273,108 @@ const Dashboard = () => {
                 </option>
               ))}
             </select>
-          </div>
 
-          <div>
-            <label className="text-sm text-gray-600 mr-2">Từ ngày:</label>
             <input
               type="date"
               value={dateRange.startDate}
               onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-primary-500"
+              className="w-full px-4 py-2 bg-secondary-50 border border-secondary-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
             />
-          </div>
 
-          <div>
-            <label className="text-sm text-gray-600 mr-2">Đến ngày:</label>
             <input
               type="date"
               value={dateRange.endDate}
               onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-              className="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-primary-500"
+              className="w-full px-4 py-2 bg-secondary-50 border border-secondary-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
             />
           </div>
         </div>
+      </Card>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatsCard
+          title="Tổng giáo viên"
+          value={stats.totalTeachers}
+          icon={Users}
+          color="indigo"
+        />
+        <StatsCard
+          title="Lớp Offset"
+          value={stats.totalOffsetClasses}
+          icon={BookMarked}
+          color="blue"
+        />
+        <StatsCard
+          title="Chưa phân công"
+          value={stats.pendingClasses}
+          icon={AlertCircle}
+          color="red"
+        />
+        <StatsCard
+          title="Đã hoàn thành"
+          value={stats.completedClasses}
+          icon={CheckCircle}
+          color="green"
+        />
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Tổng giáo viên</p>
-              <p className="text-3xl font-bold text-gray-800 mt-2">{stats.totalTeachers}</p>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Users className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Tổng lớp offset</p>
-              <p className="text-3xl font-bold text-gray-800 mt-2">{stats.totalOffsetClasses}</p>
-            </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <BookMarked className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-6 border-2 border-red-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Chưa có GV</p>
-              <p className="text-3xl font-bold text-red-600 mt-2">{stats.pendingClasses}</p>
-            </div>
-            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <Calendar className="w-6 h-6 text-red-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Đã phân công</p>
-              <p className="text-3xl font-bold text-blue-600 mt-2">{stats.assignedClasses || 0}</p>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Users className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Đã hoàn thành</p>
-              <p className="text-3xl font-bold text-purple-600 mt-2">{stats.completedClasses}</p>
-            </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Charts */}
+      {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Offset Classes Chart */}
-        <div className="lg:col-span-2 bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            Số lượng lớp offset theo giáo viên
-          </h3>
-          <div className="h-80">
-            <Bar data={offsetClassesChartData} options={chartOptions} />
+        {/* Main Chart */}
+        <Card className="lg:col-span-2">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-secondary-900">Thống kê giờ dạy</h3>
+            <select className="text-xs bg-secondary-50 border-none rounded-lg px-2 py-1 text-secondary-600 focus:ring-0">
+              <option>Tháng này</option>
+              <option>Tháng trước</option>
+            </select>
           </div>
-        </div>
+          <div className="h-80">
+            <Bar data={teachingHoursChartData} options={commonOptions} />
+          </div>
+        </Card>
 
-        {/* Status Distribution Chart */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Trạng thái lớp offset</h3>
-          <div className="h-80">
-            <Doughnut data={statusChartData} options={doughnutOptions} />
+        {/* Status Chart */}
+        <Card>
+          <h3 className="text-lg font-bold text-secondary-900 mb-6">Trạng thái lớp</h3>
+          <div className="h-64 flex items-center justify-center">
+            <Doughnut 
+              data={statusChartData} 
+              options={{
+                ...commonOptions,
+                cutout: '70%',
+                plugins: {
+                  ...commonOptions.plugins,
+                  legend: { position: 'bottom' }
+                },
+                scales: { display: false }
+              }} 
+            />
           </div>
-        </div>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="text-xs text-secondary-500">Chờ</p>
+              <p className="font-bold text-danger-600">{stats.pendingClasses}</p>
+            </div>
+            <div>
+              <p className="text-xs text-secondary-500">Đã gán</p>
+              <p className="font-bold text-primary-600">{stats.assignedClasses}</p>
+            </div>
+            <div>
+              <p className="text-xs text-secondary-500">Xong</p>
+              <p className="font-bold text-success-600">{stats.completedClasses}</p>
+            </div>
+          </div>
+        </Card>
 
-        {/* Teaching Hours Chart */}
-        <div className="lg:col-span-3 bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            Số giờ dạy của giáo viên
-          </h3>
+        {/* Secondary Chart */}
+        <Card className="lg:col-span-3">
+          <h3 className="text-lg font-bold text-secondary-900 mb-6">Phân bố lớp Offset</h3>
           <div className="h-80">
-            <Bar data={teachingHoursChartData} options={chartOptions} />
+            <Bar data={offsetClassesChartData} options={commonOptions} />
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

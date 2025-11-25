@@ -6,10 +6,10 @@ import {
   BookOpen,
   Calendar,
   BookMarked,
-  X
+  GraduationCap
 } from 'lucide-react';
 
-const Sidebar = ({ isOpen }) => {
+const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
 
   const menuItems = [
@@ -29,16 +29,36 @@ const Sidebar = ({ isOpen }) => {
 
   return (
     <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-secondary-900/50 backdrop-blur-sm lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar Container */}
       <div
         className={`${
           isOpen ? 'translate-x-0' : '-translate-x-full'
-        } fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}
+        } fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-secondary-200 shadow-xl lg:shadow-none transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col`}
       >
-        <div className="flex items-center justify-between p-6 border-b">
-          <h1 className="text-2xl font-bold text-primary-600">LMS</h1>
+        {/* Logo Area */}
+        <div className="flex items-center px-8 py-6 border-b border-secondary-100">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary-600 text-white shadow-lg shadow-primary-500/30 mr-3">
+            <GraduationCap className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-secondary-900 tracking-tight">LMS Connect</h1>
+            <p className="text-xs text-secondary-500 font-medium">Education Management</p>
+          </div>
         </div>
 
-        <nav className="mt-6">
+        {/* Navigation */}
+        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto scrollbar-hide">
+          <p className="px-4 text-xs font-semibold text-secondary-400 uppercase tracking-wider mb-4">
+            Menu Chính
+          </p>
           {menuItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
@@ -47,25 +67,36 @@ const Sidebar = ({ isOpen }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center px-6 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-colors ${
-                  active ? 'bg-primary-50 text-primary-600 border-r-4 border-primary-600' : ''
+                onClick={() => window.innerWidth < 1024 && onClose && onClose()}
+                className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                  active
+                    ? 'bg-primary-50 text-primary-700 shadow-sm'
+                    : 'text-secondary-600 hover:bg-secondary-50 hover:text-secondary-900'
                 }`}
               >
-                <Icon className="w-5 h-5 mr-3" />
-                <span className="font-medium">{item.label}</span>
+                <Icon 
+                  className={`w-5 h-5 mr-3 transition-colors ${
+                    active ? 'text-primary-600' : 'text-secondary-400 group-hover:text-secondary-600'
+                  }`} 
+                />
+                {item.label}
+                {active && (
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-600" />
+                )}
               </Link>
             );
           })}
         </nav>
 
-        <div className="absolute bottom-0 w-full p-6 border-t">
-          <div className="flex items-center">
-            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
+        {/* User Profile (Bottom) */}
+        <div className="p-4 border-t border-secondary-100">
+          <div className="flex items-center p-3 rounded-xl bg-secondary-50 border border-secondary-100">
+            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center border-2 border-white shadow-sm">
               <Users className="w-5 h-5 text-primary-600" />
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-700">Admin</p>
-              <p className="text-xs text-gray-500">admin@lms.com</p>
+            <div className="ml-3 overflow-hidden">
+              <p className="text-sm font-semibold text-secondary-900 truncate">Administrator</p>
+              <p className="text-xs text-secondary-500 truncate">admin@lms.com</p>
             </div>
           </div>
         </div>
@@ -75,3 +106,4 @@ const Sidebar = ({ isOpen }) => {
 };
 
 export default Sidebar;
+

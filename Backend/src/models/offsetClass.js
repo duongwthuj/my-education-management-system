@@ -54,6 +54,11 @@ const offsetClassSchema = new Schema(
             type: Date,    // Thời gian gửi email (optional cho manual creation)
             required: false
         }
+        ,
+        assignedHistory: {
+            type: [{ type: Schema.Types.ObjectId, ref: 'Teacher' }],
+            default: []
+        }
     },
     { timestamps: true }
 );

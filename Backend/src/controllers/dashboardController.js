@@ -91,19 +91,22 @@ export const getTeachingHoursStats = async (req, res) => {
     const teacherStats = [];
 
     for (const teacher of teachers) {
-      // Get fixed schedules
-      const fixedSchedules = await FixedSchedule.find({ teacherId: teacher._id })
+      // Get fixed schedules (chỉ lấy những cái active)
+      const fixedSchedules = await FixedSchedule.find({ 
+        teacherId: teacher._id,
+        isActive: true
+      })
         .populate('subjectId', 'name')
         .lean();
 
-      // Get offset classes in date range
+      // Get offset classes in date range (bao gồm cả pending và assigned để tính đúng workload)
       const offsetClasses = await OffsetClass.find({
         assignedTeacherId: teacher._id,
         scheduledDate: {
           $gte: new Date(startDate),
           $lte: new Date(endDate)
         },
-        status: { $in: ['assigned', 'completed'] }
+        status: { $in: ['pending', 'assigned', 'completed'] }
       })
         .populate({
           path: 'subjectLevelId',
@@ -204,8 +207,11 @@ export const getTeacherHoursDetail = async (req, res) => {
       });
     }
 
-    // Get fixed schedules with details
-    const fixedSchedules = await FixedSchedule.find({ teacherId })
+    // Get fixed schedules with details (chỉ lấy những cái active)
+    const fixedSchedules = await FixedSchedule.find({ 
+      teacherId,
+      isActive: true
+    })
       .populate('subjectId', 'name code')
       .lean();
 
@@ -245,14 +251,14 @@ export const getTeacherHoursDetail = async (req, res) => {
       });
     }
 
-    // Get offset classes with details
+    // Get offset classes with details (bao gồm cả pending và assigned để tính đúng workload)
     const offsetClasses = await OffsetClass.find({
       assignedTeacherId: teacherId,
       scheduledDate: {
         $gte: new Date(startDate),
         $lte: new Date(endDate)
       },
-      status: { $in: ['assigned', 'completed'] }
+      status: { $in: ['pending', 'assigned', 'completed'] }
     })
       .populate({
         path: 'subjectLevelId',

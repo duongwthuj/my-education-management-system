@@ -140,6 +140,8 @@ export const createOffsetClassWithAssignment = async (req, res) => {
         if (suitableTeacher) {
             offsetClass.assignedTeacherId = suitableTeacher._id;
             offsetClass.status = 'assigned';
+            // initialize assignedHistory for new class
+            offsetClass.assignedHistory = [];
         }
 
         await offsetClass.save();
@@ -226,7 +228,8 @@ export const createBulkOffsetClasses = async (req, res) => {
             const offsetClass = new OffsetClass({
                 ...result.offsetClass,
                 assignedTeacherId: result.assignedTeacher?._id || null,
-                status: result.assignedTeacher ? 'assigned' : 'pending'
+                status: result.assignedTeacher ? 'assigned' : 'pending',
+                assignedHistory: []
             });
 
             await offsetClass.save();
@@ -290,6 +293,11 @@ export const autoAssignTeacher = async (req, res) => {
             });
         }
 
+        // push previous teacher to history if exists
+        if (offsetClass.assignedTeacherId) {
+            offsetClass.assignedHistory = offsetClass.assignedHistory || [];
+            offsetClass.assignedHistory.push(offsetClass.assignedTeacherId);
+        }
         offsetClass.assignedTeacherId = suitableTeacher._id;
         offsetClass.status = 'assigned';
         await offsetClass.save();
@@ -363,6 +371,12 @@ export const reallocateTeacher = async (req, res) => {
 
         const offsetClass = await OffsetClass.findById(req.params.id);
         const oldTeacherId = offsetClass.assignedTeacherId;
+
+        // push old teacher into history to avoid cycling
+        if (oldTeacherId) {
+            offsetClass.assignedHistory = offsetClass.assignedHistory || [];
+            offsetClass.assignedHistory.push(oldTeacherId);
+        }
 
         offsetClass.assignedTeacherId = newTeacher._id;
         offsetClass.status = 'assigned';
