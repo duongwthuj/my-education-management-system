@@ -390,7 +390,23 @@ const Schedule = () => {
   };
 
   // Data processing for views
-  const weekDates = getWeekDates(filterStartDate);
+  // Generate dates based on the selected date range
+  const getDateRange = (startDate, endDate) => {
+    const dates = [];
+    if (!startDate || !endDate) return dates;
+    
+    let current = new Date(startDate);
+    const end = new Date(endDate);
+    
+    while (current <= end) {
+      dates.push(current.toISOString().split('T')[0]);
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return dates;
+  };
+  
+  const weekDates = getDateRange(filterStartDate, filterEndDate);
   
   // Helper: Check if a time falls within a period
   const isTimeInPeriod = (time, period) => {
@@ -465,11 +481,10 @@ const Schedule = () => {
 
   // Add fixed schedules
   if (filterStartDate && filterEndDate) {
-    const dates = getWeekDates(filterStartDate); // Use calculated dates for consistency
-    console.log('Processing fixed schedules for dates:', dates);
+    console.log('Processing fixed schedules for dates:', weekDates);
     console.log('Total fixed schedules available:', fixedSchedules.length);
     
-    dates.forEach(date => {
+    weekDates.forEach(date => {
       const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(date).getDay()];
       
       teachersToDisplay.forEach(teacher => {
@@ -487,12 +502,20 @@ const Schedule = () => {
           shiftsToDisplay.forEach(shift => {
             const slotKey = `${date}_${shift._id}`;
             
-            // Filter schedules that overlap with this shift
+            // Filter schedules that start in this shift (not overlap)
             const schedulesInShift = teacherFixedSchedules.filter(fs => {
-              // Simple time overlap check
-              // Note: Ideally use timeToMinutes helper, but for now string comparison might work if formats are consistent HH:mm
-              // Better to import timeToMinutes or duplicate it
-              return fs.startTime < shift.endTime && fs.endTime > shift.startTime;
+              // Convert times to minutes for accurate comparison
+              const timeToMinutes = (timeStr) => {
+                const [hours, minutes] = timeStr.split(':').map(Number);
+                return hours * 60 + minutes;
+              };
+              
+              const fsStartMinutes = timeToMinutes(fs.startTime);
+              const shiftStartMinutes = timeToMinutes(shift.startTime);
+              const shiftEndMinutes = timeToMinutes(shift.endTime);
+              
+              // Only check if the schedule STARTS within this shift
+              return fsStartMinutes >= shiftStartMinutes && fsStartMinutes < shiftEndMinutes;
             });
 
             if (schedulesInShift.length > 0) {
@@ -683,6 +706,7 @@ const Schedule = () => {
           groupedByTeacher={groupedByTeacher}
           offsetClasses={offsetClasses}
           fixedScheduleLeaves={fixedScheduleLeaves}
+          allTeachersDetails={allTeachersDetails}
           onSlotClick={handleSlotClick}
           onScheduleClick={handleScheduleClick}
           onEditOffset={handleEditOffset}

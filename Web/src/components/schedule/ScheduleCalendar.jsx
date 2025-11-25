@@ -8,6 +8,7 @@ const ScheduleCalendar = ({
   groupedByTeacher, 
   offsetClasses, 
   fixedScheduleLeaves,
+  allTeachersDetails,
   onSlotClick,
   onScheduleClick,
   onEditOffset,
@@ -42,15 +43,14 @@ const ScheduleCalendar = ({
     const shiftStartMinutes = timeToMinutes(shift.startTime);
     const shiftEndMinutes = timeToMinutes(shift.endTime);
     
-    // Get all fixed schedules that overlap with this shift
+    // Get all fixed schedules that start in this shift
     const fixedSchedulesInShift = teacher.fixedSchedules.filter(fs => {
       if (fs.dayOfWeek !== dayName) return false;
       const fsStartMinutes = timeToMinutes(fs.startTime);
-      const fsEndMinutes = timeToMinutes(fs.endTime);
-      return fsStartMinutes < shiftEndMinutes && fsEndMinutes > shiftStartMinutes;
+      return fsStartMinutes >= shiftStartMinutes && fsStartMinutes < shiftEndMinutes;
     });
     
-    // Get all offset classes for this teacher on this date in this shift
+    // Get all offset classes for this teacher on this date that start in this shift
     const offsetClassesInShift = offsetClasses.filter(oc => {
       if (!oc.assignedTeacherId || (oc.status !== 'assigned' && oc.status !== 'completed')) return false;
       
@@ -59,8 +59,7 @@ const ScheduleCalendar = ({
       
       if (ocTeacherId === teacherId && ocDate === date) {
         const ocStartMinutes = timeToMinutes(oc.startTime);
-        const ocEndMinutes = timeToMinutes(oc.endTime);
-        return ocStartMinutes < shiftEndMinutes && ocEndMinutes > shiftStartMinutes;
+        return ocStartMinutes >= shiftStartMinutes && ocStartMinutes < shiftEndMinutes;
       }
       return false;
     });
@@ -278,6 +277,20 @@ const ScheduleCalendar = ({
                         });
                       });
 
+                      // Calculate free time slots if there are schedules
+                      const freeSlots = (hasFixedSchedules || hasOffsetClasses) && allTeachersDetails
+                        ? getFreeTimeSlots(teacherId, date, shift, allTeachersDetails)
+                        : [];
+
+                      // Add free slots to items
+                      freeSlots.forEach((slot) => {
+                        allItems.push({
+                          type: 'free',
+                          startTime: slot.start,
+                          data: slot
+                        });
+                      });
+
                       // Sort ALL items by start time
                       allItems.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
 
@@ -305,7 +318,7 @@ const ScheduleCalendar = ({
                               </div>
                             </button>
                           );
-                        } else {
+                        } else if (item.type === 'offset') {
                           const oc = item.data;
                           
                           return (
@@ -326,6 +339,22 @@ const ScheduleCalendar = ({
                               </div>
                               <div className="text-[7px] text-purple-500 truncate">
                                 {oc.className}
+                              </div>
+                            </div>
+                          );
+                        } else if (item.type === 'free') {
+                          const slot = item.data;
+                          
+                          return (
+                            <div
+                              key={`free-${idx}`}
+                              className="w-full text-left text-[9px] px-1.5 py-1 rounded border bg-success-50 text-success-800 border-success-200 mb-1 last:mb-0 shadow-sm"
+                            >
+                              <div className="font-bold truncate flex items-center gap-1">
+                                ⏰ Rảnh
+                              </div>
+                              <div className="text-[8px] text-success-600">
+                                {slot.start}-{slot.end}
                               </div>
                             </div>
                           );
