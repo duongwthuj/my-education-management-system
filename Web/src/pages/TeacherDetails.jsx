@@ -28,7 +28,10 @@ const TeacherDetails = () => {
     startTime: '08:00',
     endTime: '10:00',
     meetingLink: '',
-    notes: ''
+    notes: '',
+    startDate: '', // Ngày bắt đầu (bắt buộc)
+    endDate: '', // Ngày kết thúc (không bắt buộc)
+    role: 'teacher'
   });
 
   useEffect(() => {
@@ -162,7 +165,10 @@ const TeacherDetails = () => {
         startTime: '08:00',
         endTime: '10:00',
         meetingLink: '',
-        notes: ''
+        notes: '',
+        startDate: '',
+        endDate: '',
+        role: 'teacher'
       });
       setEditingSchedule(null);
       loadData();
@@ -180,7 +186,10 @@ const TeacherDetails = () => {
       startTime: schedule.startTime,
       endTime: schedule.endTime,
       meetingLink: schedule.meetingLink || '',
-      notes: schedule.notes || ''
+      notes: schedule.notes || '',
+      startDate: schedule.startDate ? schedule.startDate.split('T')[0] : '',
+      endDate: schedule.endDate ? schedule.endDate.split('T')[0] : '',
+      role: schedule.role || 'teacher'
     });
     setShowScheduleModal(true);
   };
@@ -432,7 +441,8 @@ const TeacherDetails = () => {
                   startTime: '08:00',
                   endTime: '10:00',
                   meetingLink: '',
-                  notes: ''
+                  notes: '',
+                  role: 'teacher'
                 });
                 setShowScheduleModal(true);
               }}
@@ -470,49 +480,57 @@ const TeacherDetails = () => {
                       {/* Schedule Details - Expandable */}
                       {expandedDays[day] && (
                         <div className="p-3 space-y-2 bg-white">
-                          {dayData.schedules.map((schedule) => (
-                            <div key={schedule._id} className="border rounded-lg p-3 hover:bg-gray-50">
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-medium text-gray-800">{schedule.className}</span>
-                                    <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-800">
-                                      ⏰ {schedule.startTime} - {schedule.endTime}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-gray-600">
-                                    📚 {schedule.subjectId?.name || schedule.subjectLevelId?.subjectId?.name || 'N/A'}
-                                  </p>
-                                  {schedule.meetingLink && (
-                                    <p className="text-xs text-blue-600 truncate mt-1">
-                                      🔗 <a href={schedule.meetingLink} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                        {schedule.meetingLink}
-                                      </a>
+                          {dayData.schedules.map((schedule) => {
+                            const isEnded = schedule.endDate && new Date(schedule.endDate) < new Date();
+                            return (
+                              <div key={schedule._id} className={`border rounded-lg p-3 ${isEnded ? 'bg-gray-100 border-gray-200' : 'hover:bg-gray-50'}`}>
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className={`font-medium ${isEnded ? 'text-gray-500' : 'text-gray-800'}`}>{schedule.className}</span>
+                                      <span className={`text-xs px-2 py-0.5 rounded ${isEnded ? 'bg-gray-200 text-gray-600' : 'bg-blue-100 text-blue-800'}`}>
+                                        ⏰ {schedule.startTime} - {schedule.endTime}
+                                      </span>
+                                      {isEnded && (
+                                        <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-600 font-medium">
+                                          Kết thúc
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className={`text-xs ${isEnded ? 'text-gray-400' : 'text-gray-600'}`}>
+                                      📚 {schedule.subjectId?.name || schedule.subjectLevelId?.subjectId?.name || 'N/A'}
                                     </p>
-                                  )}
-                                  {schedule.notes && (
-                                    <p className="text-xs text-gray-500 mt-1">💬 {schedule.notes}</p>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1 ml-2">
-                                  <button
-                                    onClick={() => handleEditSchedule(schedule)}
-                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                    title="Chỉnh sửa"
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteSchedule(schedule._id)}
-                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                    title="Xóa"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                    {schedule.meetingLink && (
+                                      <p className={`text-xs truncate mt-1 ${isEnded ? 'text-gray-400' : 'text-blue-600'}`}>
+                                        🔗 <a href={schedule.meetingLink} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                          {schedule.meetingLink}
+                                        </a>
+                                      </p>
+                                    )}
+                                    {schedule.notes && (
+                                      <p className={`text-xs mt-1 ${isEnded ? 'text-gray-400' : 'text-gray-500'}`}>💬 {schedule.notes}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1 ml-2">
+                                    <button
+                                      onClick={() => handleEditSchedule(schedule)}
+                                      className={`p-1 rounded ${isEnded ? 'text-gray-400 hover:bg-gray-200' : 'text-blue-600 hover:bg-blue-50'}`}
+                                      title="Chỉnh sửa"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteSchedule(schedule._id)}
+                                      className={`p-1 rounded ${isEnded ? 'text-gray-400 hover:bg-gray-200' : 'text-red-600 hover:bg-red-50'}`}
+                                      title="Xóa"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -678,6 +696,20 @@ const TeacherDetails = () => {
                     onChange={(e) => setScheduleForm({ ...scheduleForm, className: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vai trò
+                  </label>
+                  <select
+                    value={scheduleForm.role || 'teacher'}
+                    onChange={(e) => setScheduleForm({ ...scheduleForm, role: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="teacher">Giảng chính</option>
+                    <option value="tutor">Trợ giảng</option>
+                  </select>
                 </div>
 
                 <div>
@@ -855,6 +887,36 @@ const TeacherDetails = () => {
                   </div>
                 </div>
 
+                {/* Date Range */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Ngày bắt đầu <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={scheduleForm.startDate}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, startDate: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Lịch cố định có hiệu lực từ ngày này</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Ngày kết thúc
+                    </label>
+                    <input
+                      type="date"
+                      value={scheduleForm.endDate}
+                      onChange={(e) => setScheduleForm({ ...scheduleForm, endDate: e.target.value })}
+                      min={scheduleForm.startDate}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Để trống nếu không có ngày kết thúc</p>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Link meeting (Zoom, Google Meet...)
@@ -895,7 +957,9 @@ const TeacherDetails = () => {
                       startTime: '08:00',
                       endTime: '10:00',
                       meetingLink: '',
-                      notes: ''
+                      notes: '',
+                      startDate: '',
+                      endDate: ''
                     });
                   }}
                   className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50"

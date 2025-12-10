@@ -18,6 +18,11 @@ const fixedScheduleLeaveSchema = new Schema(
         },
         reason: {
             type: String
+        },
+        substituteTeacherId: {
+            type: Schema.Types.ObjectId,
+            ref: "Teacher",
+            required: false
         }
     },
     { timestamps: true }

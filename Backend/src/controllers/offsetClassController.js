@@ -1,7 +1,7 @@
 import OffsetClass from '../models/offsetClass.js';
 import offsetAllocationService from '../services/offsetAllocationService.js';
 import emailNotificationService from '../services/emailNotificationService.js';
- import googleSheetsService from '../services/googleSheetsService.js';
+import googleSheetsService from '../services/googleSheetsService.js';
 
 // GET all offset classes
 export const getAllOffsetClasses = async (req, res) => {
@@ -21,10 +21,16 @@ export const getAllOffsetClasses = async (req, res) => {
         if (startDate || endDate) {
             query.scheduledDate = {};
             if (startDate) {
-                query.scheduledDate.$gte = new Date(startDate);
+                // Set to start of day in UTC
+                const start = new Date(startDate);
+                start.setUTCHours(0, 0, 0, 0);
+                query.scheduledDate.$gte = start;
             }
             if (endDate) {
-                query.scheduledDate.$lte = new Date(endDate);
+                // Set to end of day in UTC
+                const end = new Date(endDate);
+                end.setUTCHours(23, 59, 59, 999);
+                query.scheduledDate.$lte = end;
             }
         }
 
@@ -134,9 +140,26 @@ export const createOffsetClassWithAssignment = async (req, res) => {
         if (suitableTeacher) {
             offsetClass.assignedTeacherId = suitableTeacher._id;
             offsetClass.status = 'assigned';
+            // initialize assignedHistory for new class
+            offsetClass.assignedHistory = [];
         }
 
         await offsetClass.save();
+
+        // Update teacher lên Google Sheet nếu có teacher
+        if (suitableTeacher) {
+            try {
+                await googleSheetsService.updateTeacherToSheet(
+                    offsetClass._id.toString(),
+                    offsetClass.scheduledDate,
+                    suitableTeacher.name,
+                    suitableTeacher.email
+                );
+                console.log(`📝 Updated teacher ${suitableTeacher.name} (${suitableTeacher.email}) to Google Sheet for ${offsetClass.className}`);
+            } catch (sheetError) {
+                console.error('Failed to update Google Sheet:', sheetError.message);
+            }
+        }
 
         // Gửi email thông báo nếu đã phân công
         if (suitableTeacher) {
@@ -205,7 +228,8 @@ export const createBulkOffsetClasses = async (req, res) => {
             const offsetClass = new OffsetClass({
                 ...result.offsetClass,
                 assignedTeacherId: result.assignedTeacher?._id || null,
-                status: result.assignedTeacher ? 'assigned' : 'pending'
+                status: result.assignedTeacher ? 'assigned' : 'pending',
+                assignedHistory: []
             });
 
             await offsetClass.save();
@@ -269,9 +293,28 @@ export const autoAssignTeacher = async (req, res) => {
             });
         }
 
+        // push previous teacher to history if exists
+        if (offsetClass.assignedTeacherId) {
+            offsetClass.assignedHistory = offsetClass.assignedHistory || [];
+            offsetClass.assignedHistory.push(offsetClass.assignedTeacherId);
+        }
         offsetClass.assignedTeacherId = suitableTeacher._id;
         offsetClass.status = 'assigned';
         await offsetClass.save();
+
+        // Update teacher lên Google Sheet
+        try {
+            await googleSheetsService.updateTeacherToSheet(
+                offsetClass._id.toString(),
+                offsetClass.scheduledDate,
+                suitableTeacher.name,
+                suitableTeacher.email
+            );
+            console.log(`📝 Updated teacher ${suitableTeacher.name} (${suitableTeacher.email}) to Google Sheet for ${offsetClass.className}`);
+        } catch (sheetError) {
+            console.error('Failed to update Google Sheet:', sheetError.message);
+            // Không throw error vì việc update sheet là optional
+        }
 
         // Gửi email thông báo
         try {
@@ -329,9 +372,28 @@ export const reallocateTeacher = async (req, res) => {
         const offsetClass = await OffsetClass.findById(req.params.id);
         const oldTeacherId = offsetClass.assignedTeacherId;
 
+        // push old teacher into history to avoid cycling
+        if (oldTeacherId) {
+            offsetClass.assignedHistory = offsetClass.assignedHistory || [];
+            offsetClass.assignedHistory.push(oldTeacherId);
+        }
+
         offsetClass.assignedTeacherId = newTeacher._id;
         offsetClass.status = 'assigned';
         await offsetClass.save();
+
+        // Update teacher lên Google Sheet
+        try {
+            await googleSheetsService.updateTeacherToSheet(
+                offsetClass._id.toString(),
+                offsetClass.scheduledDate,
+                newTeacher.name,
+                newTeacher.email
+            );
+            console.log(`📝 Updated teacher ${newTeacher.name} (${newTeacher.email}) to Google Sheet for ${offsetClass.className}`);
+        } catch (sheetError) {
+            console.error('Failed to update Google Sheet:', sheetError.message);
+        }
 
         // Gửi email cho giáo viên mới
         try {
@@ -378,6 +440,15 @@ export const reallocateTeacher = async (req, res) => {
 // UPDATE offset class
 export const updateOffsetClass = async (req, res) => {
     try {
+        // Lấy thông tin cũ trước khi update (để so sánh giáo viên)
+        const oldOffsetClass = await OffsetClass.findById(req.params.id);
+        if (!oldOffsetClass) {
+            return res.status(404).json({
+                success: false,
+                message: 'Offset class not found'
+            });
+        }
+
         const offsetClass = await OffsetClass.findByIdAndUpdate(
             req.params.id,
             req.body,
@@ -392,11 +463,22 @@ export const updateOffsetClass = async (req, res) => {
             })
             .populate('assignedTeacherId', 'name email phone');
 
-        if (!offsetClass) {
-            return res.status(404).json({
-                success: false,
-                message: 'Offset class not found'
-            });
+        // Nếu có thay đổi giáo viên, cập nhật lên Google Sheet
+        if (req.body.assignedTeacherId &&
+            oldOffsetClass.assignedTeacherId?.toString() !== req.body.assignedTeacherId) {
+            try {
+                const teacherName = offsetClass.assignedTeacherId?.name || 'Chưa phân công';
+                const teacherEmail = offsetClass.assignedTeacherId?.email || '';
+                await googleSheetsService.updateTeacherToSheet(
+                    offsetClass._id.toString(),
+                    offsetClass.scheduledDate,
+                    teacherName,
+                    teacherEmail
+                );
+                console.log(`📝 Updated teacher ${teacherName} (${teacherEmail}) to Google Sheet for ${offsetClass.className}`);
+            } catch (sheetError) {
+                console.error('Failed to update Google Sheet:', sheetError.message);
+            }
         }
 
         res.status(200).json({
@@ -458,12 +540,20 @@ export const markAsCompleted = async (req, res) => {
         // Update teacher to Google Sheet
         if (offsetClass.assignedTeacherId) {
             try {
+                // Debug logging
+                console.log('� Offset Class ID:', offsetClass._id);
+                console.log('🔍 Assigned Teacher ID:', offsetClass.assignedTeacherId._id || offsetClass.assignedTeacherId);
+                console.log('�📧 Teacher object:', JSON.stringify(offsetClass.assignedTeacherId, null, 2));
+                console.log('📧 Teacher email:', offsetClass.assignedTeacherId.email);
+                console.log('📧 Teacher name:', offsetClass.assignedTeacherId.name);
+
                 await googleSheetsService.updateTeacherToSheet(
-                    offsetClass.className,
+                    offsetClass._id.toString(),
                     offsetClass.scheduledDate,
-                    offsetClass.assignedTeacherId.name
+                    offsetClass.assignedTeacherId.name,
+                    offsetClass.assignedTeacherId.email
                 );
-                console.log(`✅ Updated teacher ${offsetClass.assignedTeacherId.name} to Google Sheet for class ${offsetClass.className}`);
+                console.log(`✅ Updated teacher ${offsetClass.assignedTeacherId.name} (${offsetClass.assignedTeacherId.email}) to Google Sheet for class ${offsetClass.className}`);
             } catch (sheetError) {
                 console.error('Error updating Google Sheet:', sheetError.message);
                 // Don't fail the whole request if sheet update fails

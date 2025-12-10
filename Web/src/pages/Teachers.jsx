@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Edit, Trash2, Eye, Mail, Phone } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Mail, Phone, Search, Filter, MoreVertical } from 'lucide-react';
 import { teachersAPI } from '../services/api';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import Badge from '../components/ui/Badge';
 
 const Teachers = () => {
   const [teachers, setTeachers] = useState([]);
@@ -15,6 +18,7 @@ const Teachers = () => {
     status: 'active',
   });
   const [editingId, setEditingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     loadTeachers();
@@ -23,7 +27,7 @@ const Teachers = () => {
   const loadTeachers = async () => {
     try {
       setLoading(true);
-      const response = await teachersAPI.getAll();
+      const response = await teachersAPI.getAll({ limit: 1000 });
       setTeachers(response.data || []);
       setLoading(false);
     } catch (error) {
@@ -75,10 +79,10 @@ const Teachers = () => {
   };
 
   const getStatusBadge = (status) => {
-    const colors = {
-      active: 'bg-green-100 text-green-800',
-      inactive: 'bg-gray-100 text-gray-800',
-      on_leave: 'bg-yellow-100 text-yellow-800',
+    const variants = {
+      active: 'success',
+      inactive: 'neutral',
+      on_leave: 'warning',
     };
     const labels = {
       active: 'Đang hoạt động',
@@ -86,225 +90,273 @@ const Teachers = () => {
       on_leave: 'Nghỉ phép',
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status]}`}>
-        {labels[status]}
-      </span>
+      <Badge variant={variants[status] || 'neutral'}>
+        {labels[status] || status}
+      </Badge>
     );
   };
 
+  const filteredTeachers = teachers.filter(teacher => 
+    teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    teacher.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Đang tải dữ liệu...</p>
-        </div>
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Quản lý Giáo viên</h1>
-          <p className="text-gray-600 mt-2">Danh sách giáo viên trong hệ thống</p>
+          <h1 className="text-2xl font-bold text-secondary-900">Quản lý Giáo viên</h1>
+          <p className="text-secondary-500 mt-1">Danh sách giáo viên trong hệ thống</p>
         </div>
-        <button
+        <Button
           onClick={() => {
             setFormData({ name: '', email: '', phone: '', maxOffsetClasses: 5, status: 'active' });
             setEditingId(null);
             setShowModal(true);
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-5 h-5 mr-2" />
           Thêm giáo viên
-        </button>
+        </Button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Giáo viên
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Liên hệ
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Số lớp offset tối đa
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Trạng thái
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Thao tác
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {teachers.map((teacher) => (
-              <tr key={teacher._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                      <span className="text-primary-600 font-semibold">
-                        {teacher.name.charAt(0)}
-                      </span>
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{teacher.name}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900 flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-gray-400" />
-                    {teacher.email}
-                  </div>
-                  {teacher.phone && (
-                    <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
-                      <Phone className="w-4 h-4 text-gray-400" />
-                      {teacher.phone}
-                    </div>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{teacher.maxOffsetClasses || 0}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {getStatusBadge(teacher.status)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex items-center justify-end gap-2">
-                    <Link
-                      to={`/teachers/${teacher._id}`}
-                      className="text-primary-600 hover:text-primary-900"
-                    >
-                      <Eye className="w-5 h-5" />
-                    </Link>
-                    <button
-                      onClick={() => handleEdit(teacher)}
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      <Edit className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(teacher._id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {teachers.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Chưa có giáo viên nào trong hệ thống</p>
+      <Card noPadding className="overflow-hidden">
+        {/* Filters & Search */}
+        <div className="p-4 border-b border-secondary-200 bg-secondary-50 flex flex-col md:flex-row gap-4 justify-between items-center">
+          <div className="relative w-full md:w-96">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="w-5 h-5 text-secondary-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Tìm kiếm theo tên, email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="block w-full pl-10 pr-4 py-2 bg-white border border-secondary-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+            />
           </div>
-        )}
-      </div>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm">
+              <Filter className="w-4 h-4 mr-2" />
+              Bộ lọc
+            </Button>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-secondary-200">
+            <thead className="bg-secondary-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">
+                  Giáo viên
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">
+                  Liên hệ
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">
+                  Số lớp offset tối đa
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">
+                  Trạng thái
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-secondary-500 uppercase tracking-wider">
+                  Thao tác
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-secondary-200">
+              {filteredTeachers.map((teacher) => (
+                <tr key={teacher._id} className="hover:bg-secondary-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                        <span className="text-primary-700 font-bold text-sm">
+                          {teacher.name.charAt(0)}
+                        </span>
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-semibold text-secondary-900">{teacher.name}</div>
+                        <div className="text-xs text-secondary-500">ID: {teacher._id.slice(-6)}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center text-sm text-secondary-600">
+                        <Mail className="w-4 h-4 mr-2 text-secondary-400" />
+                        {teacher.email}
+                      </div>
+                      {teacher.phone && (
+                        <div className="flex items-center text-sm text-secondary-600">
+                          <Phone className="w-4 h-4 mr-2 text-secondary-400" />
+                          {teacher.phone}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm font-medium text-secondary-900 bg-secondary-100 px-2 py-1 rounded-md">
+                      {teacher.maxOffsetClasses || 0} lớp
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getStatusBadge(teacher.status)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center justify-end gap-2">
+                      <Link
+                        to={`/teachers/${teacher._id}`}
+                        className="p-2 text-secondary-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                        title="Xem chi tiết"
+                      >
+                        <Eye className="w-5 h-5" />
+                      </Link>
+                      <button
+                        onClick={() => handleEdit(teacher)}
+                        className="p-2 text-secondary-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Chỉnh sửa"
+                      >
+                        <Edit className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(teacher._id)}
+                        className="p-2 text-secondary-400 hover:text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
+                        title="Xóa"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {filteredTeachers.length === 0 && (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-secondary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search className="w-8 h-8 text-secondary-400" />
+              </div>
+              <h3 className="text-lg font-medium text-secondary-900">Không tìm thấy giáo viên</h3>
+              <p className="text-secondary-500 mt-1">Thử thay đổi từ khóa tìm kiếm hoặc thêm giáo viên mới.</p>
+            </div>
+          )}
+        </div>
+      </Card>
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-xl font-semibold mb-4">
-              {editingId ? 'Chỉnh sửa giáo viên' : 'Thêm giáo viên mới'}
-            </h3>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Họ tên
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Số điện thoại
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Số lớp offset tối đa
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    required
-                    value={formData.maxOffsetClasses}
-                    onChange={(e) =>
-                      setFormData({ ...formData, maxOffsetClasses: parseInt(e.target.value) })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Trạng thái
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500"
-                  >
-                    <option value="active">Đang hoạt động</option>
-                    <option value="inactive">Ngừng hoạt động</option>
-                    <option value="on_leave">Nghỉ phép</option>
-                  </select>
-                </div>
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-secondary-900/75 backdrop-blur-sm" onClick={() => setShowModal(false)}></div>
+            </div>
+
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <h3 className="text-xl font-bold text-secondary-900 mb-4">
+                  {editingId ? 'Chỉnh sửa giáo viên' : 'Thêm giáo viên mới'}
+                </h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-secondary-700 mb-1">
+                      Họ tên <span className="text-danger-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+                      placeholder="Nhập họ tên giáo viên"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-secondary-700 mb-1">
+                      Email <span className="text-danger-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+                      placeholder="example@domain.com"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-secondary-700 mb-1">
+                        Số điện thoại
+                      </label>
+                      <input
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+                        placeholder="0912..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-secondary-700 mb-1">
+                        Số lớp offset tối đa
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={formData.maxOffsetClasses}
+                        onChange={(e) =>
+                          setFormData({ ...formData, maxOffsetClasses: parseInt(e.target.value) })
+                        }
+                        className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-secondary-700 mb-1">
+                      Trạng thái
+                    </label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+                    >
+                      <option value="active">Đang hoạt động</option>
+                      <option value="inactive">Ngừng hoạt động</option>
+                      <option value="on_leave">Nghỉ phép</option>
+                    </select>
+                  </div>
+                  
+                  <div className="mt-6 flex gap-3 justify-end pt-4 border-t border-secondary-100">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setShowModal(false);
+                        setEditingId(null);
+                        setFormData({ name: '', email: '', phone: '', maxOffsetClasses: 5, status: 'active' });
+                      }}
+                    >
+                      Hủy
+                    </Button>
+                    <Button type="submit">
+                      {editingId ? 'Cập nhật' : 'Tạo mới'}
+                    </Button>
+                  </div>
+                </form>
               </div>
-              <div className="mt-6 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    setEditingId(null);
-                    setFormData({ name: '', email: '', phone: '', maxOffsetClasses: 5, status: 'active' });
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                >
-                  {editingId ? 'Cập nhật' : 'Tạo mới'}
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

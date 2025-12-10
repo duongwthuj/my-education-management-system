@@ -1,11 +1,13 @@
 import FixedScheduleLeave from '../models/fixedScheduleLeave.js';
 import FixedSchedule from '../models/fixedScheduled.js';
+import OffsetClass from '../models/offsetClass.js';
+import SubjectLevel from '../models/subjectLevel.js';
 
 // Get all leaves for fixed schedules
 export const getFixedScheduleLeaves = async (req, res) => {
     try {
         const { teacherId, startDate, endDate } = req.query;
-        
+
         const filter = {};
         if (teacherId) filter.teacherId = teacherId;
         if (startDate && endDate) {
@@ -18,6 +20,7 @@ export const getFixedScheduleLeaves = async (req, res) => {
         const leaves = await FixedScheduleLeave.find(filter)
             .populate('fixedScheduleId')
             .populate('teacherId', 'name email')
+            .populate('substituteTeacherId', 'name email')
             .sort({ date: 1 });
 
         res.status(200).json({
@@ -36,7 +39,7 @@ export const getFixedScheduleLeaves = async (req, res) => {
 // Create a leave for fixed schedule
 export const createFixedScheduleLeave = async (req, res) => {
     try {
-        const { fixedScheduleId, date, reason } = req.body;
+        const { fixedScheduleId, date, reason, substituteTeacherId } = req.body;
 
         if (!fixedScheduleId || !date) {
             return res.status(400).json({
@@ -71,12 +74,17 @@ export const createFixedScheduleLeave = async (req, res) => {
             fixedScheduleId,
             teacherId: fixedSchedule.teacherId,
             date: new Date(date),
-            reason
+            reason,
+            substituteTeacherId: substituteTeacherId || null
         });
+
+        // Logic creates Offset Class removed as per requirement. 
+        // Substitute teacher is now managed directly via FixedScheduleLeave record.
 
         const populatedLeave = await FixedScheduleLeave.findById(leave._id)
             .populate('fixedScheduleId')
-            .populate('teacherId', 'name email');
+            .populate('teacherId', 'name email')
+            .populate('substituteTeacherId', 'name email');
 
         res.status(201).json({
             success: true,
@@ -100,19 +108,24 @@ export const createFixedScheduleLeave = async (req, res) => {
 // Delete a leave (restore the schedule)
 export const deleteFixedScheduleLeave = async (req, res) => {
     try {
+        const { id } = req.params;
         const { fixedScheduleId, date } = req.query;
 
-        if (!fixedScheduleId || !date) {
+        let leave;
+
+        if (id) {
+            leave = await FixedScheduleLeave.findByIdAndDelete(id);
+        } else if (fixedScheduleId && date) {
+            leave = await FixedScheduleLeave.findOneAndDelete({
+                fixedScheduleId,
+                date: new Date(date)
+            });
+        } else {
             return res.status(400).json({
                 success: false,
-                message: 'fixedScheduleId and date are required'
+                message: 'Leave ID or (fixedScheduleId and date) are required'
             });
         }
-
-        const leave = await FixedScheduleLeave.findOneAndDelete({
-            fixedScheduleId,
-            date: new Date(date)
-        });
 
         if (!leave) {
             return res.status(404).json({
@@ -120,6 +133,8 @@ export const deleteFixedScheduleLeave = async (req, res) => {
                 message: 'Leave not found'
             });
         }
+
+        // Cleanup associated OffsetClass logic removed as we no longer create them.
 
         res.status(200).json({
             success: true,

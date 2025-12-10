@@ -7,21 +7,27 @@ import TeacherDetails from './pages/TeacherDetails';
 import Subjects from './pages/Subjects';
 import Schedule from './pages/Schedule';
 import OffsetClasses from './pages/OffsetClasses';
+import LeaveRequests from './pages/LeaveRequests';
+
+import { NotificationProvider } from './components/ui/NotificationProvider';
 
 function App() {
   return (
-    <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/teachers" element={<Teachers />} />
-          <Route path="/teachers/:id" element={<TeacherDetails />} />
-          <Route path="/subjects" element={<Subjects />} />
-          <Route path="/schedule" element={<Schedule />} />
-          <Route path="/offset-classes" element={<OffsetClasses />} />
-        </Routes>
-      </Layout>
-    </Router>
+    <NotificationProvider>
+      <Router>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/teachers" element={<Teachers />} />
+            <Route path="/teachers/:id" element={<TeacherDetails />} />
+            <Route path="/subjects" element={<Subjects />} />
+            <Route path="/schedule" element={<Schedule />} />
+            <Route path="/offset-classes" element={<OffsetClasses />} />
+            <Route path="/leave-requests" element={<LeaveRequests />} />
+          </Routes>
+        </Layout>
+      </Router>
+    </NotificationProvider>
   );
 }
 

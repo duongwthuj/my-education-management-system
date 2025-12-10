@@ -6,10 +6,10 @@ import FixedSchedule from '../models/fixedScheduled.js';
 const calculateHours = (startTime, endTime) => {
   const [startHour, startMin] = startTime.split(':').map(Number);
   const [endHour, endMin] = endTime.split(':').map(Number);
-  
+
   const startTotalMin = startHour * 60 + startMin;
   const endTotalMin = endHour * 60 + endMin;
-  
+
   return (endTotalMin - startTotalMin) / 60;
 };
 
@@ -25,17 +25,17 @@ const getWeeksInRange = (startDate, endDate) => {
 const countDaysOfWeekInRange = (startDate, endDate, dayOfWeek) => {
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const targetDayIndex = dayNames.indexOf(dayOfWeek);
-  
+
   const start = new Date(startDate);
   const end = new Date(endDate);
   let count = 0;
-  
+
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     if (d.getDay() === targetDayIndex) {
       count++;
     }
   }
-  
+
   return count;
 };
 
@@ -43,9 +43,9 @@ const countDaysOfWeekInRange = (startDate, endDate, dayOfWeek) => {
 const countLeaveDaysInRange = async (teacherId, startDate, endDate, dayOfWeek, fixedScheduleId) => {
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const targetDayIndex = dayNames.indexOf(dayOfWeek);
-  
+
   const FixedScheduleLeave = (await import('../models/fixedScheduleLeave.js')).default;
-  
+
   // Get all fixed schedule leaves for this teacher and schedule in date range
   const leaves = await FixedScheduleLeave.find({
     teacherId,
@@ -55,7 +55,7 @@ const countLeaveDaysInRange = async (teacherId, startDate, endDate, dayOfWeek, f
       $lte: new Date(endDate)
     }
   }).lean();
-  
+
   // Count how many match the day of week
   let count = 0;
   leaves.forEach(leave => {
@@ -64,7 +64,7 @@ const countLeaveDaysInRange = async (teacherId, startDate, endDate, dayOfWeek, f
       count++;
     }
   });
-  
+
   return count;
 };
 
@@ -72,7 +72,7 @@ const countLeaveDaysInRange = async (teacherId, startDate, endDate, dayOfWeek, f
 export const getTeachingHoursStats = async (req, res) => {
   try {
     const { startDate, endDate, teacherId } = req.query;
-    
+
     if (!startDate || !endDate) {
       return res.status(400).json({
         success: false,
@@ -82,7 +82,7 @@ export const getTeachingHoursStats = async (req, res) => {
 
     // Build query filter
     const teacherFilter = teacherId ? { _id: teacherId } : {};
-    
+
     // Get all teachers with their fixed schedules
     const teachers = await Teacher.find(teacherFilter)
       .select('_id name email')
@@ -91,19 +91,22 @@ export const getTeachingHoursStats = async (req, res) => {
     const teacherStats = [];
 
     for (const teacher of teachers) {
-      // Get fixed schedules
-      const fixedSchedules = await FixedSchedule.find({ teacherId: teacher._id })
+      // Get fixed schedules (chỉ lấy những cái active)
+      const fixedSchedules = await FixedSchedule.find({
+        teacherId: teacher._id,
+        isActive: true
+      })
         .populate('subjectId', 'name')
         .lean();
 
-      // Get offset classes in date range
+      // Get offset classes in date range (bao gồm cả pending và assigned để tính đúng workload)
       const offsetClasses = await OffsetClass.find({
         assignedTeacherId: teacher._id,
         scheduledDate: {
           $gte: new Date(startDate),
           $lte: new Date(endDate)
         },
-        status: { $in: ['assigned', 'completed'] }
+        status: { $in: ['pending', 'assigned', 'completed'] }
       })
         .populate({
           path: 'subjectLevelId',
@@ -117,12 +120,53 @@ export const getTeachingHoursStats = async (req, res) => {
       // Calculate fixed schedule hours (recurring weekly)
       let fixedHours = 0;
       for (const schedule of fixedSchedules) {
-        const hoursPerClass = calculateHours(schedule.startTime, schedule.endTime);
-        const totalOccurrences = countDaysOfWeekInRange(startDate, endDate, schedule.dayOfWeek);
-        const leaveOccurrences = await countLeaveDaysInRange(teacher._id, startDate, endDate, schedule.dayOfWeek, schedule._id);
+        let hoursPerClass = calculateHours(schedule.startTime, schedule.endTime);
+
+        // Apply 0.75 multiplier for Tutors (based on schedule role)
+        if (schedule.role === 'tutor') {
+          hoursPerClass *= 0.75;
+        }
+
+        // Tính intersection của schedule date range với requested range
+        const scheduleStart = schedule.startDate ? new Date(schedule.startDate) : new Date(startDate);
+        const scheduleEnd = schedule.endDate ? new Date(schedule.endDate) : new Date(endDate);
+        const rangeStart = new Date(startDate);
+        const rangeEnd = new Date(endDate);
+
+        // Lấy overlap period
+        const effectiveStart = scheduleStart > rangeStart ? scheduleStart : rangeStart;
+        const effectiveEnd = scheduleEnd < rangeEnd ? scheduleEnd : rangeEnd;
+
+        // Nếu không có overlap thì skip
+        if (effectiveStart > effectiveEnd) continue;
+
+        const totalOccurrences = countDaysOfWeekInRange(effectiveStart, effectiveEnd, schedule.dayOfWeek);
+        const leaveOccurrences = await countLeaveDaysInRange(teacher._id, effectiveStart, effectiveEnd, schedule.dayOfWeek, schedule._id);
         const actualOccurrences = totalOccurrences - leaveOccurrences;
         fixedHours += hoursPerClass * actualOccurrences;
       }
+
+      // Calculate substitute hours from FixedScheduleLeaves
+      const FixedScheduleLeave = (await import('../models/fixedScheduleLeave.js')).default;
+      const substituteLeaves = await FixedScheduleLeave.find({
+        substituteTeacherId: teacher._id,
+        date: {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate)
+        }
+      }).populate('fixedScheduleId').lean();
+
+      let substituteHours = 0;
+      substituteLeaves.forEach(leave => {
+        if (leave.fixedScheduleId) {
+          let hours = calculateHours(leave.fixedScheduleId.startTime, leave.fixedScheduleId.endTime);
+          // Apply multiplier if role is tutor
+          if (leave.fixedScheduleId.role === 'tutor') {
+            hours *= 0.75;
+          }
+          substituteHours += hours;
+        }
+      });
 
       // Calculate offset hours
       let offsetHours = 0;
@@ -132,17 +176,19 @@ export const getTeachingHoursStats = async (req, res) => {
         offsetHours += hours;
       });
 
-      const totalHours = fixedHours + offsetHours;
+      const totalHours = fixedHours + offsetHours + substituteHours;
 
       teacherStats.push({
         teacherId: teacher._id,
         teacherName: teacher.name,
         teacherEmail: teacher.email,
         fixedHours: Math.round(fixedHours * 10) / 10,
+        substituteHours: Math.round(substituteHours * 10) / 10,
         offsetHours: Math.round(offsetHours * 10) / 10,
         totalHours: Math.round(totalHours * 10) / 10,
         fixedClassCount: fixedSchedules.length,
-        offsetClassCount: offsetClasses.length
+        offsetClassCount: offsetClasses.length,
+        substituteClassCount: substituteLeaves.length
       });
     }
 
@@ -155,6 +201,7 @@ export const getTeachingHoursStats = async (req, res) => {
       summary: {
         totalTeachers: teacherStats.length,
         totalFixedHours: Math.round(teacherStats.reduce((sum, t) => sum + t.fixedHours, 0) * 10) / 10,
+        totalSubstituteHours: Math.round(teacherStats.reduce((sum, t) => sum + t.substituteHours, 0) * 10) / 10,
         totalOffsetHours: Math.round(teacherStats.reduce((sum, t) => sum + t.offsetHours, 0) * 10) / 10,
         totalHours: Math.round(teacherStats.reduce((sum, t) => sum + t.totalHours, 0) * 10) / 10
       }
@@ -173,7 +220,7 @@ export const getTeacherHoursDetail = async (req, res) => {
   try {
     const { teacherId } = req.params;
     const { startDate, endDate } = req.query;
-    
+
     if (!startDate || !endDate) {
       return res.status(400).json({
         success: false,
@@ -182,7 +229,7 @@ export const getTeacherHoursDetail = async (req, res) => {
     }
 
     const teacher = await Teacher.findById(teacherId).select('_id name email');
-    
+
     if (!teacher) {
       return res.status(404).json({
         success: false,
@@ -190,16 +237,38 @@ export const getTeacherHoursDetail = async (req, res) => {
       });
     }
 
-    // Get fixed schedules with details
-    const fixedSchedules = await FixedSchedule.find({ teacherId })
+    // Get fixed schedules with details (chỉ lấy những cái active)
+    const fixedSchedules = await FixedSchedule.find({
+      teacherId,
+      isActive: true
+    })
       .populate('subjectId', 'name code')
       .lean();
 
     const fixedScheduleDetails = [];
     for (const schedule of fixedSchedules) {
-      const hoursPerClass = calculateHours(schedule.startTime, schedule.endTime);
-      const totalOccurrences = countDaysOfWeekInRange(startDate, endDate, schedule.dayOfWeek);
-      const leaveOccurrences = await countLeaveDaysInRange(teacherId, startDate, endDate, schedule.dayOfWeek, schedule._id);
+      let hoursPerClass = calculateHours(schedule.startTime, schedule.endTime);
+
+      // Apply 0.75 multiplier for Tutors (based on schedule role)
+      if (schedule.role === 'tutor') {
+        hoursPerClass *= 0.75;
+      }
+
+      // Tính intersection của schedule date range với requested range
+      const scheduleStart = schedule.startDate ? new Date(schedule.startDate) : new Date(startDate);
+      const scheduleEnd = schedule.endDate ? new Date(schedule.endDate) : new Date(endDate);
+      const rangeStart = new Date(startDate);
+      const rangeEnd = new Date(endDate);
+
+      // Lấy overlap period
+      const effectiveStart = scheduleStart > rangeStart ? scheduleStart : rangeStart;
+      const effectiveEnd = scheduleEnd < rangeEnd ? scheduleEnd : rangeEnd;
+
+      // Nếu không có overlap thì skip
+      if (effectiveStart > effectiveEnd) continue;
+
+      const totalOccurrences = countDaysOfWeekInRange(effectiveStart, effectiveEnd, schedule.dayOfWeek);
+      const leaveOccurrences = await countLeaveDaysInRange(teacherId, effectiveStart, effectiveEnd, schedule.dayOfWeek, schedule._id);
       const occurrences = totalOccurrences - leaveOccurrences;
       const totalHours = hoursPerClass * occurrences;
 
@@ -208,6 +277,8 @@ export const getTeacherHoursDetail = async (req, res) => {
         subject: schedule.subjectId?.name || 'N/A',
         dayOfWeek: schedule.dayOfWeek,
         timeSlot: `${schedule.startTime} - ${schedule.endTime}`,
+        startDate: schedule.startDate || 'N/A',
+        endDate: schedule.endDate || 'Không giới hạn',
         hoursPerClass,
         occurrences,
         leaveOccurrences,
@@ -215,14 +286,44 @@ export const getTeacherHoursDetail = async (req, res) => {
       });
     }
 
-    // Get offset classes with details
+    // Get substitute teaching details
+    const FixedScheduleLeave = (await import('../models/fixedScheduleLeave.js')).default;
+    const substituteLeaves = await FixedScheduleLeave.find({
+      substituteTeacherId: teacherId,
+      date: {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      }
+    }).populate('fixedScheduleId').lean();
+
+    const substituteDetails = [];
+    substituteLeaves.forEach(leave => {
+      if (leave.fixedScheduleId) {
+        let hours = calculateHours(leave.fixedScheduleId.startTime, leave.fixedScheduleId.endTime);
+        // Apply multiplier if role is tutor
+        if (leave.fixedScheduleId.role === 'tutor') {
+          hours *= 0.75;
+        }
+
+        substituteDetails.push({
+          className: leave.fixedScheduleId.className,
+          subject: 'Dạy thay', // Could populate subject if needed
+          date: leave.date,
+          timeSlot: `${leave.fixedScheduleId.startTime} - ${leave.fixedScheduleId.endTime}`,
+          hours: Math.round(hours * 10) / 10,
+          status: 'substitute'
+        });
+      }
+    });
+
+    // Get offset classes with details (bao gồm cả pending và assigned để tính đúng workload)
     const offsetClasses = await OffsetClass.find({
       assignedTeacherId: teacherId,
       scheduledDate: {
         $gte: new Date(startDate),
         $lte: new Date(endDate)
       },
-      status: { $in: ['assigned', 'completed'] }
+      status: { $in: ['pending', 'assigned', 'completed'] }
     })
       .populate({
         path: 'subjectLevelId',
@@ -250,6 +351,8 @@ export const getTeacherHoursDetail = async (req, res) => {
     const fixedHours = fixedScheduleDetails.reduce((sum, s) => sum + s.totalHours, 0);
     const offsetHours = offsetClassDetails.reduce((sum, s) => sum + s.hours, 0);
 
+    const substituteHours = substituteDetails.reduce((sum, s) => sum + s.hours, 0);
+
     res.status(200).json({
       success: true,
       data: {
@@ -260,12 +363,15 @@ export const getTeacherHoursDetail = async (req, res) => {
         },
         fixedSchedules: fixedScheduleDetails,
         offsetClasses: offsetClassDetails,
+        substituteClasses: substituteDetails,
         summary: {
           fixedHours: Math.round(fixedHours * 10) / 10,
           offsetHours: Math.round(offsetHours * 10) / 10,
-          totalHours: Math.round((fixedHours + offsetHours) * 10) / 10,
+          substituteHours: Math.round(substituteHours * 10) / 10,
+          totalHours: Math.round((fixedHours + offsetHours + substituteHours) * 10) / 10,
           fixedClassCount: fixedSchedules.length,
-          offsetClassCount: offsetClasses.length
+          offsetClassCount: offsetClasses.length,
+          substituteClassCount: substituteDetails.length
         }
       }
     });
@@ -282,31 +388,31 @@ export const getTeacherHoursDetail = async (req, res) => {
 export const getOffsetClassStatistics = async (req, res) => {
   try {
     const { startDate, endDate, teacherId } = req.query;
-    
+
     // Build query filter
     const filter = {};
-    
+
     if (startDate && endDate) {
       filter.scheduledDate = {
         $gte: new Date(startDate),
         $lte: new Date(endDate)
       };
     }
-    
+
     if (teacherId) {
       filter.assignedTeacherId = teacherId;
     }
-    
+
     // Get all offset classes matching filter
     const allOffsetClasses = await OffsetClass.find(filter).lean();
-    
+
     // Calculate statistics
     const total = allOffsetClasses.length;
     const pending = allOffsetClasses.filter(oc => oc.status === 'pending').length;
     const assigned = allOffsetClasses.filter(oc => oc.status === 'assigned').length;
     const completed = allOffsetClasses.filter(oc => oc.status === 'completed').length;
     const cancelled = allOffsetClasses.filter(oc => oc.status === 'cancelled').length;
-    
+
     // Group by teacher
     const byTeacher = {};
     allOffsetClasses.forEach(oc => {
@@ -323,7 +429,7 @@ export const getOffsetClassStatistics = async (req, res) => {
       byTeacher[teacherId].total++;
       byTeacher[teacherId][oc.status]++;
     });
-    
+
     // Group by subject level
     const bySubjectLevel = {};
     allOffsetClasses.forEach(oc => {
@@ -340,7 +446,7 @@ export const getOffsetClassStatistics = async (req, res) => {
       bySubjectLevel[subjectLevelId].total++;
       bySubjectLevel[subjectLevelId][oc.status]++;
     });
-    
+
     res.status(200).json({
       success: true,
       data: {

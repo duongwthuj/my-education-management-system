@@ -144,9 +144,17 @@ export const importOffsetFromSheet = async (req, res) => {
         const createdClasses = [];
         
         for (const buoi of cac_buoi) {
+            // Validate buổi data
+            if (!buoi.ngay || !buoi.gio_bat_dau || !buoi.gio_ket_thuc) {
+                console.warn('⚠️ Invalid buoi data, skipping:', buoi);
+                continue;
+            }
+
             // Parse date từ format dd/MM/yyyy
             const [day, month, year] = buoi.ngay.split('/');
             const scheduledDate = new Date(year, month - 1, day);
+
+            console.log(`📅 Creating offset class: ${ma_lop} on ${buoi.ngay} (${buoi.gio_bat_dau}-${buoi.gio_ket_thuc})`);
 
             const offsetClass = await OffsetClass.create({
                 subjectLevelId: subjectLevel._id,
