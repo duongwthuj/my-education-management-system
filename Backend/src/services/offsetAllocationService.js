@@ -26,10 +26,9 @@ class OffsetAllocationService {
         console.log(`   📚 Subject Level: ${subjectLevelId}`);
         if (excludeTeacherIds) {
             console.log(
-                `   🚫 Excluding teacher(s): ${
-                    Array.isArray(excludeTeacherIds)
-                        ? excludeTeacherIds.join(',')
-                        : excludeTeacherIds
+                `   🚫 Excluding teacher(s): ${Array.isArray(excludeTeacherIds)
+                    ? excludeTeacherIds.join(',')
+                    : excludeTeacherIds
                 }`
             );
         }
@@ -192,8 +191,7 @@ class OffsetAllocationService {
             console.log(
                 `   ${index + 1}. ${st.teacher.name}: ${st.score.toFixed(
                     2
-                )} points (${workload?.totalHours.toFixed(1)}h, ${
-                    workload?.offsetCount
+                )} points (${workload?.totalHours.toFixed(1)}h, ${workload?.offsetCount
                 } offsets)`
             );
         });
@@ -318,50 +316,37 @@ class OffsetAllocationService {
         console.log('DEBUG: workShifts found:', workShifts);
         console.log(`   📋 Found ${workShifts.length} work shifts for this day`);
 
-        if (!workShifts || workShifts.length === 0) {
-            console.log(
-                `   ❌ REJECTED: Teacher ${teacherId} has NO work shifts on this day`
-            );
-            return 0;
-        }
+        // Kiểm tra WorkShift - Bắt buộc phải có lịch làm việc và lớp offset phải nằm trong ca
+        // Nếu không có ca hoặc không khớp giờ -> Reject
 
         let hasMatchingShift = false;
         let matchingShiftDetails = null;
 
-        for (const ws of workShifts) {
-            if (!ws.shiftId) {
-                console.log(
-                    `   ⚠️ Warning: WorkShift ${ws._id} missing shiftId reference`
-                );
-                continue;
-            }
+        if (workShifts && workShifts.length > 0) {
+            for (const ws of workShifts) {
+                if (!ws.shiftId) continue;
 
-            const shiftStart = ws.shiftId.startTime;
-            const shiftEnd = ws.shiftId.endTime;
+                const shiftStart = ws.shiftId.startTime;
+                const shiftEnd = ws.shiftId.endTime;
 
-            const inRange = this.isTimeInRange(startTime, endTime, shiftStart, shiftEnd);
+                const inRange = this.isTimeInRange(startTime, endTime, shiftStart, shiftEnd);
 
-            console.log(
-                `   🕐 Checking shift: ${shiftStart}-${shiftEnd} vs offset: ${startTime}-${endTime} → ${
-                    inRange ? 'MATCH ✅' : 'NO MATCH ❌'
-                }`
-            );
-
-            if (inRange) {
-                hasMatchingShift = true;
-                matchingShiftDetails = `${shiftStart}-${shiftEnd}`;
-                break;
+                if (inRange) {
+                    hasMatchingShift = true;
+                    matchingShiftDetails = `${shiftStart}-${shiftEnd}`;
+                    break;
+                }
             }
         }
 
-        if (!hasMatchingShift) {
+        if (hasMatchingShift) {
+            console.log(`   ✅ Found matching shift: ${matchingShiftDetails}`);
+        } else {
             console.log(
-                `   ❌ REJECTED: No shift covers the required time ${startTime}-${endTime}`
+                `   ❌ REJECTED: No matching shift found (Required to be within work schedule)`
             );
             return 0;
         }
-
-        console.log(`   ✅ Found matching shift: ${matchingShiftDetails}`);
 
         // 2) FixedSchedule – xung đột lịch cố định
         const dayOfWeek = this.getDayOfWeek(queryDate);

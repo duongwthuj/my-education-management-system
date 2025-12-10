@@ -150,7 +150,7 @@ export const createOffsetClassWithAssignment = async (req, res) => {
         if (suitableTeacher) {
             try {
                 await googleSheetsService.updateTeacherToSheet(
-                    offsetClass.className,
+                    offsetClass._id.toString(),
                     offsetClass.scheduledDate,
                     suitableTeacher.name,
                     suitableTeacher.email
@@ -305,7 +305,7 @@ export const autoAssignTeacher = async (req, res) => {
         // Update teacher lên Google Sheet
         try {
             await googleSheetsService.updateTeacherToSheet(
-                offsetClass.className,
+                offsetClass._id.toString(),
                 offsetClass.scheduledDate,
                 suitableTeacher.name,
                 suitableTeacher.email
@@ -385,7 +385,7 @@ export const reallocateTeacher = async (req, res) => {
         // Update teacher lên Google Sheet
         try {
             await googleSheetsService.updateTeacherToSheet(
-                offsetClass.className,
+                offsetClass._id.toString(),
                 offsetClass.scheduledDate,
                 newTeacher.name,
                 newTeacher.email
@@ -464,13 +464,13 @@ export const updateOffsetClass = async (req, res) => {
             .populate('assignedTeacherId', 'name email phone');
 
         // Nếu có thay đổi giáo viên, cập nhật lên Google Sheet
-        if (req.body.assignedTeacherId && 
+        if (req.body.assignedTeacherId &&
             oldOffsetClass.assignedTeacherId?.toString() !== req.body.assignedTeacherId) {
             try {
                 const teacherName = offsetClass.assignedTeacherId?.name || 'Chưa phân công';
                 const teacherEmail = offsetClass.assignedTeacherId?.email || '';
                 await googleSheetsService.updateTeacherToSheet(
-                    offsetClass.className,
+                    offsetClass._id.toString(),
                     offsetClass.scheduledDate,
                     teacherName,
                     teacherEmail
@@ -540,12 +540,20 @@ export const markAsCompleted = async (req, res) => {
         // Update teacher to Google Sheet
         if (offsetClass.assignedTeacherId) {
             try {
+                // Debug logging
+                console.log('� Offset Class ID:', offsetClass._id);
+                console.log('🔍 Assigned Teacher ID:', offsetClass.assignedTeacherId._id || offsetClass.assignedTeacherId);
+                console.log('�📧 Teacher object:', JSON.stringify(offsetClass.assignedTeacherId, null, 2));
+                console.log('📧 Teacher email:', offsetClass.assignedTeacherId.email);
+                console.log('📧 Teacher name:', offsetClass.assignedTeacherId.name);
+
                 await googleSheetsService.updateTeacherToSheet(
-                    offsetClass.className,
+                    offsetClass._id.toString(),
                     offsetClass.scheduledDate,
-                    offsetClass.assignedTeacherId.name
+                    offsetClass.assignedTeacherId.name,
+                    offsetClass.assignedTeacherId.email
                 );
-                console.log(`✅ Updated teacher ${offsetClass.assignedTeacherId.name} to Google Sheet for class ${offsetClass.className}`);
+                console.log(`✅ Updated teacher ${offsetClass.assignedTeacherId.name} (${offsetClass.assignedTeacherId.email}) to Google Sheet for class ${offsetClass.className}`);
             } catch (sheetError) {
                 console.error('Error updating Google Sheet:', sheetError.message);
                 // Don't fail the whole request if sheet update fails

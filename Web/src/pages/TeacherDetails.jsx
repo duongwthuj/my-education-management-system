@@ -476,49 +476,57 @@ const TeacherDetails = () => {
                       {/* Schedule Details - Expandable */}
                       {expandedDays[day] && (
                         <div className="p-3 space-y-2 bg-white">
-                          {dayData.schedules.map((schedule) => (
-                            <div key={schedule._id} className="border rounded-lg p-3 hover:bg-gray-50">
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-medium text-gray-800">{schedule.className}</span>
-                                    <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-800">
-                                      ⏰ {schedule.startTime} - {schedule.endTime}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-gray-600">
-                                    📚 {schedule.subjectId?.name || schedule.subjectLevelId?.subjectId?.name || 'N/A'}
-                                  </p>
-                                  {schedule.meetingLink && (
-                                    <p className="text-xs text-blue-600 truncate mt-1">
-                                      🔗 <a href={schedule.meetingLink} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                        {schedule.meetingLink}
-                                      </a>
+                          {dayData.schedules.map((schedule) => {
+                            const isEnded = schedule.endDate && new Date(schedule.endDate) < new Date();
+                            return (
+                              <div key={schedule._id} className={`border rounded-lg p-3 ${isEnded ? 'bg-gray-100 border-gray-200' : 'hover:bg-gray-50'}`}>
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className={`font-medium ${isEnded ? 'text-gray-500' : 'text-gray-800'}`}>{schedule.className}</span>
+                                      <span className={`text-xs px-2 py-0.5 rounded ${isEnded ? 'bg-gray-200 text-gray-600' : 'bg-blue-100 text-blue-800'}`}>
+                                        ⏰ {schedule.startTime} - {schedule.endTime}
+                                      </span>
+                                      {isEnded && (
+                                        <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-600 font-medium">
+                                          Kết thúc
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className={`text-xs ${isEnded ? 'text-gray-400' : 'text-gray-600'}`}>
+                                      📚 {schedule.subjectId?.name || schedule.subjectLevelId?.subjectId?.name || 'N/A'}
                                     </p>
-                                  )}
-                                  {schedule.notes && (
-                                    <p className="text-xs text-gray-500 mt-1">💬 {schedule.notes}</p>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1 ml-2">
-                                  <button
-                                    onClick={() => handleEditSchedule(schedule)}
-                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                    title="Chỉnh sửa"
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteSchedule(schedule._id)}
-                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                    title="Xóa"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                    {schedule.meetingLink && (
+                                      <p className={`text-xs truncate mt-1 ${isEnded ? 'text-gray-400' : 'text-blue-600'}`}>
+                                        🔗 <a href={schedule.meetingLink} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                          {schedule.meetingLink}
+                                        </a>
+                                      </p>
+                                    )}
+                                    {schedule.notes && (
+                                      <p className={`text-xs mt-1 ${isEnded ? 'text-gray-400' : 'text-gray-500'}`}>💬 {schedule.notes}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1 ml-2">
+                                    <button
+                                      onClick={() => handleEditSchedule(schedule)}
+                                      className={`p-1 rounded ${isEnded ? 'text-gray-400 hover:bg-gray-200' : 'text-blue-600 hover:bg-blue-50'}`}
+                                      title="Chỉnh sửa"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteSchedule(schedule._id)}
+                                      className={`p-1 rounded ${isEnded ? 'text-gray-400 hover:bg-gray-200' : 'text-red-600 hover:bg-red-50'}`}
+                                      title="Xóa"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

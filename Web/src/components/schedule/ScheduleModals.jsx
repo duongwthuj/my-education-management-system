@@ -351,7 +351,7 @@ export const OffsetClassModal = ({
   onClose, 
   formData, 
   setFormData, 
-  subjectLevels, 
+  subjectLevels,
   handleSubmit, 
   quickCreateData 
 }) => {
@@ -371,7 +371,7 @@ export const OffsetClassModal = ({
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-1">
-                Học phần <span className="text-danger-500">*</span>
+                Môn học & Học phần <span className="text-danger-500">*</span>
               </label>
               <select
                 required
@@ -379,10 +379,10 @@ export const OffsetClassModal = ({
                 onChange={(e) => setFormData({ ...formData, subjectLevelId: e.target.value })}
                 className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
               >
-                <option value="">-- Chọn học phần --</option>
+                <option value="">-- Chọn môn học & học phần --</option>
                 {subjectLevels.map(level => (
                   <option key={level._id} value={level._id}>
-                    {level.displayName}
+                    {level.displayName || `${level.subjectId?.name} - Level ${level.level}`}
                   </option>
                 ))}
               </select>

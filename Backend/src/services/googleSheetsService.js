@@ -32,22 +32,22 @@ const initSheetsClient = async () => {
 export const getOffsetClassesFromSheet = async () => {
     try {
         const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
-        
+
         console.log('🔍 Checking GOOGLE_SHEET_ID:', SPREADSHEET_ID);
-        
+
         const sheetsClient = await initSheetsClient();
-        
+
         if (!SPREADSHEET_ID) {
             throw new Error('GOOGLE_SHEET_ID not configured in .env');
         }
 
         const response = await sheetsClient.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: 'OffsetAI!A2:D', // Bỏ qua header row
+            range: 'OffsetAI!A2:E', // Đọc đến E để lấy status
         });
 
         const rows = response.data.values || [];
-        
+
         const offsetClasses = rows
             .filter(row => row[2] && row[2].startsWith('{')) // Có JSON data
             .map(row => {
@@ -57,7 +57,7 @@ export const getOffsetClassesFromSheet = async () => {
                         sender: row[0],
                         sentTime: new Date(row[1]),
                         data: jsonData,
-                        status: row[3] || 'pending'
+                        status: row[4] || 'pending' // Cột E là status (index 4)
                     };
                 } catch (err) {
                     console.error('Error parsing JSON from row:', err.message);
@@ -75,173 +75,233 @@ export const getOffsetClassesFromSheet = async () => {
 };
 
 /**
- * Update giáo viên đã dạy vào Google Sheet
- * @param {String} className - Mã lớp
- * @param {Date} scheduledDate - Ngày học
- * @param {String} teacherName - Tên giáo viên
+ * Ghi Offset Class ID vào Google Sheet (cột H) sau khi tạo offset class
+ * @param {String} sender - Email người gửi
+ * @param {Date} sentTime - Thời gian gửi
+ * @param {String} scheduledDate - Ngày học (để match với buổi học)
+ * @param {String} offsetClassId - ID của offset class vừa tạo
  */
-export const updateTeacherToSheet = async (className, scheduledDate, teacherName, teacherEmail = '') => {
+export const writeOffsetClassIdToSheet = async (sender, sentTime, scheduledDate, offsetClassId) => {
     try {
         const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
         const sheetsClient = await initSheetsClient();
-        
-        console.log(`🔍 Tìm kiếm lớp: ${className}, ngày: ${scheduledDate}, giáo viên: ${teacherName}, email: ${teacherEmail}`);
-        
-        // Đọc tất cả dữ liệu từ sheet (bao gồm cột E - Giáo viên, F - Email)
+
+        console.log(`📝 Writing offset class ID ${offsetClassId} to sheet for ${sender} on ${scheduledDate}`);
+
+        // Đọc tất cả dữ liệu từ sheet
         const response = await sheetsClient.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: 'OffsetAI!A2:F',
+            range: 'OffsetAI!A2:H',
+        });
+
+        const rows = response.data.values || [];
+
+        // Tìm row theo sender + sentTime
+        const targetTime = new Date(sentTime).getTime();
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rowSender = row[0];
+            const rowTime = new Date(row[1]).getTime();
+
+            // Match sender và time (sai số 1 phút)
+            if (rowSender === sender && Math.abs(rowTime - targetTime) < 60000) {
+                const actualRowNumber = i + 2;
+                const currentIds = row[7] || ''; // Cột H - Offset Class IDs
+
+                // Parse scheduledDate để tạo mapping
+                const dateObj = new Date(scheduledDate);
+                const day = dateObj.getDate();
+                const month = dateObj.getMonth() + 1;
+                const shortDate = `${day}/${month}`;
+
+                // Parse existing IDs với format: "1/12: 674c123...\n2/12: 674c456..."
+                const idMap = new Map();
+                if (currentIds) {
+                    const parts = currentIds.split(/[\n,]/).map(p => p.trim()).filter(p => p);
+                    parts.forEach(part => {
+                        const dateMatch = part.match(/^(\d{1,2}\/\d{1,2}):\s*(.+)$/);
+                        if (dateMatch) {
+                            idMap.set(dateMatch[1], dateMatch[2]);
+                        }
+                    });
+                }
+
+                // Add new ID
+                idMap.set(shortDate, offsetClassId);
+
+                // Rebuild string
+                const newIds = Array.from(idMap.entries())
+                    .map(([date, id]) => `${date}: ${id}`)
+                    .join('\n');
+
+                // Update cột H
+                await sheetsClient.spreadsheets.values.update({
+                    spreadsheetId: SPREADSHEET_ID,
+                    range: `OffsetAI!H${actualRowNumber}`,
+                    valueInputOption: 'RAW',
+                    resource: {
+                        values: [[newIds]],
+                    },
+                });
+
+                console.log(`✅ Wrote offset class ID ${offsetClassId} for ${shortDate} to row ${actualRowNumber}`);
+                return { success: true, rowNumber: actualRowNumber };
+            }
+        }
+
+        console.log(`⚠️ No matching row found for sender ${sender} at ${sentTime}`);
+        return { success: false, message: 'No matching row found' };
+
+    } catch (error) {
+        console.error('Error writing offset class ID to sheet:', error.message);
+        throw error;
+    }
+};
+
+/**
+ * Update giáo viên đã dạy vào Google Sheet
+ * @param {String} offsetClassId - ID của offset class
+ * @param {Date} scheduledDate - Ngày học (để format dd/MM)
+ * @param {String} teacherName - Tên giáo viên
+ * @param {String} teacherEmail - Email giáo viên
+ */
+export const updateTeacherToSheet = async (offsetClassId, scheduledDate, teacherName, teacherEmail = '') => {
+    try {
+        const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
+        const sheetsClient = await initSheetsClient();
+
+        console.log(`🔍 Tìm kiếm offset class ID: ${offsetClassId}, ngày: ${scheduledDate}, giáo viên: ${teacherName}, email: ${teacherEmail}`);
+
+        // Đọc tất cả dữ liệu từ sheet (bao gồm cột H - Offset Class IDs)
+        const response = await sheetsClient.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: 'OffsetAI!A2:H',
         });
 
         const rows = response.data.values || [];
         console.log(`📊 Tìm thấy ${rows.length} rows trong sheet`);
-        
-        // Tìm row khớp với className và scheduledDate
-        // Xử lý scheduledDate - có thể là Date object hoặc string
+
+        // Parse scheduledDate để tạo shortDate
         let targetDateObj;
         if (scheduledDate instanceof Date) {
             targetDateObj = scheduledDate;
         } else {
             targetDateObj = new Date(scheduledDate);
         }
-        
-        // Format thành YYYY-MM-DD sử dụng local date (không dùng UTC để tránh lệch múi giờ)
-        const year = targetDateObj.getFullYear();
-        const month = String(targetDateObj.getMonth() + 1).padStart(2, '0');
-        const day = String(targetDateObj.getDate()).padStart(2, '0');
-        const targetDate = `${year}-${month}-${day}`;
-        console.log(`📅 Target date: ${targetDate} (from ${scheduledDate})`);
-        
+
+        const day = targetDateObj.getDate();
+        const month = targetDateObj.getMonth() + 1;
+        const shortDate = `${day}/${month}`;
+        console.log(`📅 Short date for mapping: ${shortDate}`);
+
+        // Tìm row theo Offset Class ID trong cột H
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
-            const jsonData = row[2]; // Cột C chứa JSON
-            
-            if (!jsonData || !jsonData.startsWith('{')) continue;
-            
-            try {
-                const data = JSON.parse(jsonData);
-                const maLop = data.ma_lop;
-                const cacBuoi = data.cac_buoi || [];
-                
-                // Kiểm tra xem có buổi nào khớp với scheduledDate không
-                const hasMatchingSession = cacBuoi.some(buoi => {
-                    if (!buoi.ngay) return false;
-                    const [day, month, year] = buoi.ngay.split('/');
-                    // Format thành YYYY-MM-DD để so sánh (không dùng Date object để tránh timezone)
-                    const buoiDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const isMatch = buoiDate === targetDate;
-                    if (maLop === className) {
-                        console.log(`  Buổi ${buoi.ngay} -> Format: ${buoiDate}, Match: ${isMatch}`);
-                    }
-                    return isMatch;
-                });
-                
-                if (maLop === className && hasMatchingSession) {
-                    console.log(`✅ Tìm thấy lớp ${className} tại row ${i + 2}`);
-                    const actualRowNumber = i + 2; // +2 vì header và zero-based
-                    const currentTeachers = row[4] || ''; // Cột E - Giáo viên
-                    const currentEmails = row[5] || ''; // Cột F - Email
-                    
-                    // Format target date để map (dd/MM)
-                    const [year, month, day] = targetDate.split('-');
-                    const shortDate = `${parseInt(day)}/${parseInt(month)}`;
-                    
-                    // Parse current teachers với format: "15/11: GV A\n16/11: GV B" hoặc "15/11: GV A, 16/11: GV B"
-                    const teacherMap = new Map();
-                    const emailMap = new Map();
-                    const oldFormatTeachers = []; // Giữ lại các GV format cũ (không có ngày)
-                    
-                    // Parse existing teachers - support cả \n và ,
-                    if (currentTeachers) {
-                        const parts = currentTeachers.split(/[\n,]/).map(p => p.trim()).filter(p => p);
-                        parts.forEach(part => {
-                            const dateMatch = part.match(/^(\d{1,2}\/\d{1,2}):\s*(.+)$/);
-                            if (dateMatch) {
-                                // Format mới: "15/11: GV A"
-                                teacherMap.set(dateMatch[1], dateMatch[2]);
-                            } else if (part) {
-                                // Format cũ: chỉ có tên GV (không có ngày)
-                                oldFormatTeachers.push(part);
-                            }
-                        });
-                    }
-                    
-                    // Parse existing emails với format: "15/11: email1@teky.vn\n16/11: email2@teky.vn" hoặc dấu phẩy
-                    if (currentEmails) {
-                        const parts = currentEmails.split(/[\n,]/).map(p => p.trim()).filter(p => p);
-                        parts.forEach(part => {
-                            const dateMatch = part.match(/^(\d{1,2}\/\d{1,2}):\s*(.+)$/);
-                            if (dateMatch) {
-                                emailMap.set(dateMatch[1], dateMatch[2]);
-                            }
-                        });
-                    }
-                    
-                    // Update teacher và email cho ngày này
-                    teacherMap.set(shortDate, teacherName);
-                    emailMap.set(shortDate, teacherEmail);
-                    
-                    // Rebuild string với format: "15/11: GV A\n16/11: GV B" (xuống dòng)
-                    const newFormatTeachers = Array.from(teacherMap.entries())
-                        .map(([date, teacher]) => `${date}: ${teacher}`)
-                        .join('\n');
-                    
-                    // Rebuild email string với format: "15/11: email1@teky.vn\n16/11: email2@teky.vn" (xuống dòng)
-                    const newFormatEmails = Array.from(emailMap.entries())
-                        .map(([date, email]) => `${date}: ${email}`)
-                        .join('\n');
-                    
-                    // Kết hợp: format mới + format cũ (nếu có)
-                    const updatedTeachers = oldFormatTeachers.length > 0 
-                        ? `${newFormatTeachers}\n${oldFormatTeachers.join('\n')}`
-                        : newFormatTeachers;
-                    
-                    // Cập nhật cả teacher và email
-                    await sheetsClient.spreadsheets.values.update({
-                        spreadsheetId: SPREADSHEET_ID,
-                        range: `OffsetAI!E${actualRowNumber}:F${actualRowNumber}`,
-                        valueInputOption: 'RAW',
-                        resource: {
-                            values: [[updatedTeachers, newFormatEmails]],
-                        },
+            const offsetClassIds = row[7] || ''; // Cột H - Offset Class IDs
+
+            // Check nếu offsetClassId có trong cột H
+            // Format: "1/12: 674c123...\n2/12: 674c456..."
+            if (offsetClassIds.includes(offsetClassId)) {
+                console.log(`✅ Tìm thấy offset class ${offsetClassId} tại row ${i + 2}`);
+                const actualRowNumber = i + 2; // +2 vì header và zero-based
+                const currentTeachers = row[5] || ''; // Cột F - Giáo viên (index 5)
+                const currentEmails = row[6] || ''; // Cột G - Email (index 6)
+
+                // Parse current teachers với format: "15/11: GV A\n16/11: GV B"
+                const teacherMap = new Map();
+                const emailMap = new Map();
+                const oldFormatTeachers = []; // Giữ lại các GV format cũ (không có ngày)
+
+                // Parse existing teachers - support cả \n và ,
+                if (currentTeachers) {
+                    const parts = currentTeachers.split(/[\n,]/).map(p => p.trim()).filter(p => p);
+                    parts.forEach(part => {
+                        const dateMatch = part.match(/^(\d{1,2}\/\d{1,2}):\s*(.+)$/);
+                        if (dateMatch) {
+                            // Format mới: "15/11: GV A"
+                            teacherMap.set(dateMatch[1], dateMatch[2]);
+                        } else if (part) {
+                            // Format cũ: chỉ có tên GV (không có ngày)
+                            oldFormatTeachers.push(part);
+                        }
                     });
-                    
-                    console.log(`✅ Updated teacher "${teacherName}" (${teacherEmail}) for ${shortDate} to row ${actualRowNumber} for class ${className}`);
-                    return { success: true, rowNumber: actualRowNumber, teachers: updatedTeachers, emails: newFormatEmails };
                 }
-            } catch (parseError) {
-                console.error(`Error parsing JSON at row ${i + 2}:`, parseError.message);
-                continue;
+
+                // Parse existing emails
+                if (currentEmails) {
+                    const parts = currentEmails.split(/[\n,]/).map(p => p.trim()).filter(p => p);
+                    parts.forEach(part => {
+                        const dateMatch = part.match(/^(\d{1,2}\/\d{1,2}):\s*(.+)$/);
+                        if (dateMatch) {
+                            emailMap.set(dateMatch[1], dateMatch[2]);
+                        }
+                    });
+                }
+
+                // Update teacher và email cho ngày này
+                teacherMap.set(shortDate, teacherName);
+                emailMap.set(shortDate, teacherEmail);
+
+                // Rebuild string với format: "15/11: GV A\n16/11: GV B" (xuống dòng)
+                const newFormatTeachers = Array.from(teacherMap.entries())
+                    .map(([date, teacher]) => `${date}: ${teacher}`)
+                    .join('\n');
+
+                // Rebuild email string
+                const newFormatEmails = Array.from(emailMap.entries())
+                    .map(([date, email]) => `${date}: ${email}`)
+                    .join('\n');
+
+                // Kết hợp: format mới + format cũ (nếu có)
+                const updatedTeachers = oldFormatTeachers.length > 0
+                    ? `${newFormatTeachers}\n${oldFormatTeachers.join('\n')}`
+                    : newFormatTeachers;
+
+                // Cập nhật cả teacher và email (Cột F, G)
+                await sheetsClient.spreadsheets.values.update({
+                    spreadsheetId: SPREADSHEET_ID,
+                    range: `OffsetAI!F${actualRowNumber}:G${actualRowNumber}`,
+                    valueInputOption: 'RAW',
+                    resource: {
+                        values: [[updatedTeachers, newFormatEmails]],
+                    },
+                });
+
+                console.log(`✅ Updated teacher "${teacherName}" (${teacherEmail}) for ${shortDate} to row ${actualRowNumber} for offset class ${offsetClassId}`);
+                return { success: true, rowNumber: actualRowNumber, teachers: updatedTeachers, emails: newFormatEmails };
             }
         }
-        
-        console.log(`⚠️ No matching row found for class ${className} on ${targetDate}`);
+
+        console.log(`⚠️ No matching row found for offset class ID ${offsetClassId}`);
         return { success: false, message: 'No matching row found' };
-        
+
     } catch (error) {
         console.error('Error updating teacher to sheet:', error.message);
         throw error;
     }
 };
 
+
 /**
  * Update trạng thái trong sheet (tìm row theo sender + sentTime)
  */
 export const updateOffsetStatus = async (sender, sentTime, newStatus) => {
     try {
+
         const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
         const sheetsClient = await initSheetsClient();
-        
+
         const response = await sheetsClient.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: 'OffsetAI!A2:D',
+            range: 'OffsetAI!A2:E', // Đọc đến E để tìm row (thực ra chỉ cần A, B)
         });
 
         const rows = response.data.values || [];
-        
+
         // Tìm row index (thêm 2 vì: 1 cho header, 1 cho zero-based -> 1-based)
-        const rowIndex = rows.findIndex(row => 
-            row[0] === sender && 
+        const rowIndex = rows.findIndex(row =>
+            row[0] === sender &&
             new Date(row[1]).getTime() === new Date(sentTime).getTime()
         );
 
@@ -250,8 +310,8 @@ export const updateOffsetStatus = async (sender, sentTime, newStatus) => {
         }
 
         const actualRowNumber = rowIndex + 2; // +2 vì header và zero-based
-        const range = `OffsetAI!D${actualRowNumber}`;
-        
+        const range = `OffsetAI!E${actualRowNumber}`; // Cột E là Status
+
         await sheetsClient.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
             range: range,
@@ -262,7 +322,7 @@ export const updateOffsetStatus = async (sender, sentTime, newStatus) => {
         });
 
         console.log(`✅ Updated status to "${newStatus}" at row ${actualRowNumber}`);
-        
+
         return { success: true, rowNumber: actualRowNumber };
     } catch (error) {
         console.error('Error updating offset status:', error.message);
@@ -293,7 +353,7 @@ export const fetchOffsetClassesFromSheet = async (spreadsheetId, range = 'Sheet1
         // Process each row
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
-            
+
             try {
                 // Map columns to fields
                 // Adjust column indices based on your sheet structure
@@ -351,7 +411,7 @@ export const syncOffsetClassesFromSheet = async (spreadsheetId, range = 'Sheet1!
     try {
         // Fetch data from sheet
         const sheetData = await fetchOffsetClassesFromSheet(spreadsheetId, range);
-        
+
         if (!sheetData.success || sheetData.data.length === 0) {
             return {
                 success: false,
@@ -417,30 +477,31 @@ export const syncOffsetClassesFromSheet = async (spreadsheetId, range = 'Sheet1!
  */
 function parseDate(dateStr) {
     if (!dateStr) return null;
-    
+
     // Try common formats
     // Format: DD/MM/YYYY
     if (dateStr.includes('/')) {
         const [day, month, year] = dateStr.split('/');
         return new Date(year, month - 1, day);
     }
-    
+
     // Format: YYYY-MM-DD
     if (dateStr.includes('-')) {
         return new Date(dateStr);
     }
-    
+
     // Try direct parsing
     const date = new Date(dateStr);
     if (!isNaN(date.getTime())) {
         return date;
     }
-    
+
     return null;
 }
 
 export default {
     getOffsetClassesFromSheet,
+    writeOffsetClassIdToSheet,
     updateOffsetStatus,
     updateTeacherToSheet,
     fetchOffsetClassesFromSheet,

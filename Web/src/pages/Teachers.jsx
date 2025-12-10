@@ -27,7 +27,7 @@ const Teachers = () => {
   const loadTeachers = async () => {
     try {
       setLoading(true);
-      const response = await teachersAPI.getAll();
+      const response = await teachersAPI.getAll({ limit: 1000 });
       setTeachers(response.data || []);
       setLoading(false);
     } catch (error) {

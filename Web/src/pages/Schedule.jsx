@@ -135,10 +135,10 @@ const Schedule = () => {
         subjectsRes
       ] = await Promise.all([
         scheduleAPI.getAllShifts(),
-        teachersAPI.getAll(),
+        teachersAPI.getAll({ limit: 1000 }),
         scheduleAPI.getWorkShifts(),
         fixedScheduleLeaveAPI.getAll(),
-        offsetClassesAPI.getAll(),
+        offsetClassesAPI.getAll({ limit: 1000 }),
         subjectsAPI.getAll()
       ]);
 
@@ -183,28 +183,21 @@ const Schedule = () => {
     loadData();
   }, []);
 
-  // Fetch subject levels when subject changes or modal opens
+  // Fetch subject levels when modal opens
   useEffect(() => {
     const fetchSubjectLevels = async () => {
       try {
-        // Fetch all levels for now, or optimize to fetch by selected subject if we had a subject selector
-        // Since offset class form selects SubjectLevel directly, we need all levels
-        // Or we can fetch levels for all subjects
-        const levels = [];
-        for (const subject of subjects) {
-          const res = await subjectsAPI.getLevels(subject._id);
-          levels.push(...res.data);
-        }
-        setSubjectLevels(levels);
+        const res = await subjectsAPI.getAllLevels();
+        setSubjectLevels(res.data || []);
       } catch (error) {
         console.error('Error fetching subject levels:', error);
       }
     };
 
-    if (showOffsetClassForm && subjects.length > 0) {
+    if (showOffsetClassForm) {
       fetchSubjectLevels();
     }
-  }, [showOffsetClassForm, subjects]);
+  }, [showOffsetClassForm]);
 
   // Handle date range calculation for Create Schedule Modal
   useEffect(() => {

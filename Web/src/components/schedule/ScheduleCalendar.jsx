@@ -259,11 +259,14 @@ const ScheduleCalendar = ({
                             return leaveScheduleId === fs._id && leaveDate === date;
                           });
 
+                          const isEnded = fs.endDate && new Date(fs.endDate) < new Date(date);
+
                           allItems.push({
                             type: 'fixed',
                             startTime: fs.startTime,
                             data: fs,
-                            isOnLeave
+                            isOnLeave,
+                            isEnded
                           });
                         });
                       }
@@ -277,8 +280,8 @@ const ScheduleCalendar = ({
                         });
                       });
 
-                      // Calculate free time slots if there are schedules
-                      const freeSlots = (hasFixedSchedules || hasOffsetClasses) && allTeachersDetails
+                      // Calculate free time slots if there are schedules AND there is a work shift
+                      const freeSlots = (hasFixedSchedules || hasOffsetClasses) && hasWorkShift && allTeachersDetails
                         ? getFreeTimeSlots(teacherId, date, shift, allTeachersDetails)
                         : [];
 
@@ -307,13 +310,16 @@ const ScheduleCalendar = ({
                               className={`w-full text-left text-[9px] px-1.5 py-1 rounded border transition-all mb-1 last:mb-0 shadow-sm ${
                                 isOnLeave
                                   ? 'bg-warning-50 text-warning-800 border-warning-200 hover:bg-warning-100'
+                                  : item.isEnded
+                                  ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
                                   : 'bg-primary-50 text-primary-800 border-primary-200 hover:bg-primary-100'
                               }`}
                             >
                               <div className="font-bold truncate flex items-center gap-1">
-                                {isOnLeave ? '🏖️' : '📚'} {fs.subjectId?.name || 'N/A'}
+                                {isOnLeave ? '🏖️' : item.isEnded ? '🏁' : '📚'} {fs.subjectId?.name || 'N/A'}
+                                {item.isEnded && <span className="text-[7px] bg-gray-200 px-1 rounded text-gray-600 ml-auto">Kết thúc</span>}
                               </div>
-                              <div className={`text-[8px] ${isOnLeave ? 'text-warning-600' : 'text-primary-600'}`}>
+                              <div className={`text-[8px] ${isOnLeave ? 'text-warning-600' : item.isEnded ? 'text-gray-400' : 'text-primary-600'}`}>
                                 {fs.startTime}-{fs.endTime}
                               </div>
                             </button>

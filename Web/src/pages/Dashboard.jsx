@@ -95,7 +95,7 @@ const Dashboard = () => {
       setLoading(true);
 
       // Load teachers
-      const teachersRes = await teachersAPI.getAll();
+      const teachersRes = await teachersAPI.getAll({ limit: 1000 });
       const teachersData = teachersRes.data || teachersRes || [];
       setTeachers(Array.isArray(teachersData) ? teachersData : []);
 

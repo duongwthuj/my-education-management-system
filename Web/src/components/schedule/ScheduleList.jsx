@@ -66,20 +66,28 @@ const ScheduleList = ({ groupedByTeacher }) => {
                         )}
                         
                         {/* Fixed Schedules */}
-                        {slot.fixedSchedules.map((fs, fsIdx) => (
-                          <div 
-                            key={fsIdx}
-                            className="text-xs px-2 py-1.5 rounded-lg bg-primary-50 text-primary-800 border border-primary-200"
-                          >
-                            <div className="font-bold mb-0.5 flex items-center gap-1">
-                              📚 {fs.subjectId?.name || 'N/A'}
+                        {slot.fixedSchedules.map((fs, fsIdx) => {
+                          const isEnded = fs.endDate && new Date(fs.endDate) < new Date(date);
+                          return (
+                            <div 
+                              key={fsIdx}
+                              className={`text-xs px-2 py-1.5 rounded-lg border ${
+                                isEnded 
+                                  ? 'bg-gray-100 text-gray-500 border-gray-200' 
+                                  : 'bg-primary-50 text-primary-800 border-primary-200'
+                              }`}
+                            >
+                              <div className="font-bold mb-0.5 flex items-center gap-1">
+                                {isEnded ? '🏁' : '📚'} {fs.subjectId?.name || 'N/A'}
+                                {isEnded && <span className="text-[9px] bg-gray-200 px-1 rounded text-gray-600 ml-auto">Kết thúc</span>}
+                              </div>
+                              <div className={`flex items-center gap-1 text-[10px] ${isEnded ? 'text-gray-400' : 'text-primary-600'}`}>
+                                <Clock className="w-3 h-3" />
+                                {fs.startTime}-{fs.endTime}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1 text-[10px] text-primary-600">
-                              <Clock className="w-3 h-3" />
-                              {fs.startTime}-{fs.endTime}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ))}
                   </div>

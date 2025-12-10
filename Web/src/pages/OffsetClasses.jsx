@@ -85,7 +85,7 @@ const OffsetClasses = () => {
       
       const [offsetRes, teachersRes, subjectsRes, levelsRes] = await Promise.all([
         offsetClassesAPI.getAll(params),
-        teachersAPI.getAll(),
+        teachersAPI.getAll({ limit: 1000 }),
         subjectsAPI.getAll(),
         subjectsAPI.getAllLevels(),
       ]);
