@@ -9,6 +9,7 @@ const router = express.Router();
 
 router.get('/', getFixedScheduleLeaves);
 router.post('/', createFixedScheduleLeave);
+router.delete('/:id', deleteFixedScheduleLeave);
 router.delete('/', deleteFixedScheduleLeave);
 
 export default router;

@@ -26,8 +26,16 @@ const OffsetClasses = () => {
     assignedTeacherId: '',
   });
   const [filterStatus, setFilterStatus] = useState('all');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
+  
+  // Default to current month
+  const [filterDateFrom, setFilterDateFrom] = useState(() => {
+    const now = new Date();
+    return format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
+  });
+  const [filterDateTo, setFilterDateTo] = useState(() => {
+    const now = new Date();
+    return format(new Date(now.getFullYear(), now.getMonth() + 1, 0), 'yyyy-MM-dd');
+  });
   const [autoAssigning, setAutoAssigning] = useState(false);
   const [notification, setNotification] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
@@ -429,7 +437,9 @@ const OffsetClasses = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-secondary-500 uppercase tracking-wide font-semibold">Tổng lớp offset</p>
-              <p className="text-2xl font-bold text-secondary-900 mt-1">{offsetClasses.length}</p>
+              <p className="text-2xl font-bold text-secondary-900 mt-1">
+                {offsetClasses.filter(oc => oc.status !== 'cancelled').length}
+              </p>
             </div>
             <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center">
               <BookMarked className="w-5 h-5 text-primary-600" />
@@ -442,7 +452,9 @@ const OffsetClasses = () => {
             <div>
               <p className="text-xs text-secondary-500 uppercase tracking-wide font-semibold">Chưa có giáo viên</p>
               <p className="text-2xl font-bold text-danger-600 mt-1">
-                {offsetClasses.filter(oc => !oc.assignedTeacherId).length}
+              <p className="text-2xl font-bold text-danger-600 mt-1">
+                {offsetClasses.filter(oc => !oc.assignedTeacherId && oc.status !== 'cancelled').length}
+              </p>
               </p>
             </div>
             <div className="w-10 h-10 bg-danger-50 rounded-lg flex items-center justify-center">
@@ -923,34 +935,85 @@ const OffsetClasses = () => {
                     </label>
                     
                     {/* Quick Time Presets */}
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {[
-                        { label: '7h30-9h00', start: '07:30', end: '09:00' },
-                        { label: '9h30-11h00', start: '09:30', end: '11:00' },
-                        { label: '13h30-15h00', start: '13:30', end: '15:00' },
-                        { label: '15h30-17h00', start: '15:30', end: '17:00' },
-                        { label: '17h30-19h00', start: '17:30', end: '19:00' },
-                        { label: '19h30-21h00', start: '19:30', end: '21:00' },
-                      ].map((preset, index) => (
-                        <button
-                          key={index}
-                          type="button"
-                          onClick={() => {
-                            setFormData({
-                              ...formData,
-                              startTime: preset.start,
-                              endTime: preset.end
-                            });
-                          }}
-                          className={`px-2 py-1 text-xs font-medium rounded border transition-all ${
-                            formData.startTime === preset.start && formData.endTime === preset.end
-                              ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
-                              : 'bg-white text-secondary-600 border-secondary-300 hover:border-primary-400'
-                          }`}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-yellow-100 rounded-lg">
+                          <Clock className="w-4 h-4 text-yellow-600" />
+                        </div>
+                        <span className="font-semibold text-gray-700">Gợi ý khung giờ nhanh</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {/* Buổi sáng */}
+                        <div className="p-3 rounded-xl border border-blue-100 bg-blue-50/50 flex flex-col gap-2 transition-all hover:shadow-sm">
+                          <div className="flex items-center gap-1.5 text-sm font-medium text-blue-800">
+                            <span>🌅</span>
+                            <span>Buổi sáng</span>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            {[
+                              { start: '08:00', end: '09:30' },
+                              { start: '09:30', end: '11:00' }
+                            ].map((slot, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setFormData({ ...formData, startTime: slot.start, endTime: slot.end })}
+                                className="px-2.5 py-2 text-xs font-medium rounded-lg bg-white border border-blue-200 text-blue-600 hover:text-blue-700 hover:border-blue-400 hover:bg-blue-50 transition-all w-full text-center"
+                              >
+                                {slot.start} - {slot.end}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Buổi chiều */}
+                        <div className="p-3 rounded-xl border border-orange-100 bg-orange-50/50 flex flex-col gap-2 transition-all hover:shadow-sm">
+                          <div className="flex items-center gap-1.5 text-sm font-medium text-orange-800">
+                            <span>☀️</span>
+                            <span>Buổi chiều</span>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            {[
+                              { start: '13:30', end: '15:00' },
+                              { start: '15:00', end: '16:30' },
+                              { start: '16:30', end: '18:00' }
+                            ].map((slot, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setFormData({ ...formData, startTime: slot.start, endTime: slot.end })}
+                                className="px-2.5 py-2 text-xs font-medium rounded-lg bg-white border border-orange-200 text-orange-600 hover:text-orange-700 hover:border-orange-400 hover:bg-orange-50 transition-all w-full text-center"
+                              >
+                                {slot.start} - {slot.end}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Buổi tối */}
+                        <div className="p-3 rounded-xl border border-purple-100 bg-purple-50/50 flex flex-col gap-2 transition-all hover:shadow-sm">
+                          <div className="flex items-center gap-1.5 text-sm font-medium text-purple-800">
+                            <span>🌙</span>
+                            <span>Buổi tối</span>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            {[
+                              { start: '18:00', end: '19:30' },
+                              { start: '19:30', end: '21:00' }
+                            ].map((slot, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setFormData({ ...formData, startTime: slot.start, endTime: slot.end })}
+                                className="px-2.5 py-2 text-xs font-medium rounded-lg bg-white border border-purple-200 text-purple-600 hover:text-purple-700 hover:border-purple-400 hover:bg-purple-50 transition-all w-full text-center"
+                              >
+                                {slot.start} - {slot.end}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

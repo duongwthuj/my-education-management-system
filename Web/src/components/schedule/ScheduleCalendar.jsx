@@ -54,10 +54,18 @@ const ScheduleCalendar = ({
     const offsetClassesInShift = offsetClasses.filter(oc => {
       if (!oc.assignedTeacherId || (oc.status !== 'assigned' && oc.status !== 'completed')) return false;
       
-      const ocDate = new Date(oc.scheduledDate).toISOString().split('T')[0];
       const ocTeacherId = typeof oc.assignedTeacherId === 'object' ? oc.assignedTeacherId._id : oc.assignedTeacherId;
       
-      if (ocTeacherId === teacherId && ocDate === date) {
+      // Fix date comparison: ensure strictly string match or UTC date match
+      const ocDateObj = new Date(oc.scheduledDate);
+      const ocDateStr = ocDateObj.toLocaleDateString('sv-SE'); // YYYY-MM-DD in local time
+      // or simpler manually
+      const year = ocDateObj.getFullYear();
+      const month = String(ocDateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(ocDateObj.getDate()).padStart(2, '0');
+      const formattedOcDate = `${year}-${month}-${day}`;
+
+      if (ocTeacherId === teacherId && formattedOcDate === date) {
         const ocStartMinutes = timeToMinutes(oc.startTime);
         return ocStartMinutes >= shiftStartMinutes && ocStartMinutes < shiftEndMinutes;
       }
@@ -144,7 +152,11 @@ const ScheduleCalendar = ({
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 bg-primary-100 border border-primary-300 rounded"></div>
-            <span className="text-secondary-600">Lịch cố định</span>
+            <span className="text-secondary-600">Giảng chính</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 bg-pink-100 border border-pink-300 rounded"></div>
+            <span className="text-secondary-600">Trợ giảng</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 bg-purple-100 border border-purple-300 rounded"></div>
@@ -220,10 +232,16 @@ const ScheduleCalendar = ({
                     // Check for offset classes
                     const teacherOffsetClasses = offsetClasses.filter(oc => {
                       if (!oc.assignedTeacherId || (oc.status !== 'assigned' && oc.status !== 'completed')) return false;
-                      const ocDate = new Date(oc.scheduledDate).toISOString().split('T')[0];
                       const ocTeacherId = typeof oc.assignedTeacherId === 'object' ? oc.assignedTeacherId._id : oc.assignedTeacherId;
                       
-                      if (ocTeacherId === teacherId && ocDate === date) {
+                      // Fix date comparison here too
+                      const ocDateObj = new Date(oc.scheduledDate);
+                      const year = ocDateObj.getFullYear();
+                      const month = String(ocDateObj.getMonth() + 1).padStart(2, '0');
+                      const day = String(ocDateObj.getDate()).padStart(2, '0');
+                      const formattedOcDate = `${year}-${month}-${day}`;
+                      
+                      if (ocTeacherId === teacherId && formattedOcDate === date) {
                         const ocStartMinutes = timeToMinutes(oc.startTime);
                         const shiftStartMinutes = timeToMinutes(shift.startTime);
                         const shiftEndMinutes = timeToMinutes(shift.endTime);
@@ -312,6 +330,8 @@ const ScheduleCalendar = ({
                                   ? 'bg-warning-50 text-warning-800 border-warning-200 hover:bg-warning-100'
                                   : item.isEnded
                                   ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                                  : fs.role === 'tutor'
+                                  ? 'bg-pink-50 text-pink-800 border-pink-200 hover:bg-pink-100'
                                   : 'bg-primary-50 text-primary-800 border-primary-200 hover:bg-primary-100'
                               }`}
                             >

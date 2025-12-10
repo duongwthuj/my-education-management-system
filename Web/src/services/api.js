@@ -109,7 +109,7 @@ export const dashboardAPI = {
   // Get teaching hours statistics
   getTeachingHours: (params) => api.get('/dashboard/teaching-hours', { params }),
   getTeacherHoursDetail: (teacherId, params) => api.get(`/dashboard/teaching-hours/${teacherId}`, { params }),
-  
+
   // Get offset class statistics
   getOffsetClassStatistics: (params) => api.get('/dashboard/offset-statistics', { params }),
 
@@ -145,9 +145,7 @@ export const dashboardAPI = {
 export const fixedScheduleLeaveAPI = {
   getAll: (params) => api.get('/fixed-schedule-leaves', { params }),
   create: (data) => api.post('/fixed-schedule-leaves', data),
-  delete: (fixedScheduleId, date) => api.delete('/fixed-schedule-leaves', { 
-    params: { fixedScheduleId, date } 
-  })
+  delete: (id) => api.delete(`/fixed-schedule-leaves/${id}`)
 };
 
 // Google Sheets API

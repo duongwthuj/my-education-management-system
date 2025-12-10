@@ -15,7 +15,13 @@ import {
 } from '../components/schedule/ScheduleModals';
 import { useNotification } from '../components/ui/NotificationProvider';
 
-// Helper functions
+  // Helper functions
+const toLocalISOString = (date) => {
+  const offset = date.getTimezoneOffset() * 60000;
+  const localDate = new Date(date.getTime() - offset);
+  return localDate.toISOString().slice(0, 10);
+};
+
 const getWeekDates = (startDate) => {
   const dates = [];
   const start = startDate ? new Date(startDate) : new Date();
@@ -28,22 +34,43 @@ const getWeekDates = (startDate) => {
   for (let i = 0; i < 7; i++) {
     const date = new Date(start);
     date.setDate(start.getDate() + i);
-    dates.push(date.toISOString().split('T')[0]);
+    dates.push(toLocalISOString(date));
   }
   return dates;
 };
 
 const getCurrentWeekRange = () => {
   const curr = new Date();
-  const first = curr.getDate() - curr.getDay();
+  // Adjust to get Monday as first day if needed, but keeping existing logic structure
+  // correcting timezone output
+  const first = curr.getDate() - curr.getDay(); 
   const last = first + 6;
 
   const firstDay = new Date(curr.setDate(first));
   const lastDay = new Date(curr.setDate(last));
 
   return {
-    start: firstDay.toISOString().split('T')[0],
-    end: lastDay.toISOString().split('T')[0]
+    start: toLocalISOString(firstDay),
+    end: toLocalISOString(lastDay)
+  };
+};
+
+const getDefaultViewRange = () => {
+  const today = new Date();
+  const currentDay = today.getDay(); // 0 is Sunday
+  
+  // Calculate days remaining until Sunday
+  // If today is Sunday (0), we want to show just today (dist=0) or maybe full next week?
+  // Treat 0 as 7 to ensure we target the *upcoming* Sunday of this week context
+  const dayIndex = currentDay === 0 ? 7 : currentDay;
+  const daysUntilSunday = 7 - dayIndex;
+  
+  const end = new Date(today);
+  end.setDate(today.getDate() + daysUntilSunday);
+  
+  return {
+    start: toLocalISOString(today),
+    end: toLocalISOString(end)
   };
 };
 
@@ -61,10 +88,10 @@ const Schedule = () => {
   const [allTeachersDetails, setAllTeachersDetails] = useState([]);
 
   // Filter states
-  const currentWeek = getCurrentWeekRange();
+  const defaultRange = getDefaultViewRange();
   const [filterTeacher, setFilterTeacher] = useState('');
-  const [filterStartDate, setFilterStartDate] = useState(currentWeek.start);
-  const [filterEndDate, setFilterEndDate] = useState(currentWeek.end);
+  const [filterStartDate, setFilterStartDate] = useState(defaultRange.start);
+  const [filterEndDate, setFilterEndDate] = useState(defaultRange.end);
   const [filterTimePeriod, setFilterTimePeriod] = useState(''); // morning, afternoon, evening, night
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar' or 'list'
 
@@ -299,9 +326,10 @@ const Schedule = () => {
     }
   };
 
-  const handleLeaveSubmit = async () => {
+  const handleLeaveSubmit = async (substituteTeacherId = null) => {
     try {
       if (selectedSchedule.isOnLeave) {
+        // Restore schedule (delete leave record)
         // Restore schedule (delete leave record)
         const leaveRecord = fixedScheduleLeaves.find(leave => {
           const leaveScheduleId = typeof leave.fixedScheduleId === 'object' ? leave.fixedScheduleId?._id : leave.fixedScheduleId;
@@ -310,8 +338,11 @@ const Schedule = () => {
         });
 
         if (leaveRecord) {
+          // Fix: Pass ID directly
           await fixedScheduleLeaveAPI.delete(leaveRecord._id);
           showNotification('Đã phục hồi lịch dạy', 'success');
+        } else {
+          showNotification('Không tìm thấy dữ liệu nghỉ để phục hồi', 'error');
         }
       } else {
         // Create leave request
@@ -319,7 +350,8 @@ const Schedule = () => {
           teacherId: selectedSchedule.teacherId,
           fixedScheduleId: selectedSchedule.fixedSchedule._id,
           date: selectedSchedule.date,
-          reason: 'Giáo viên xin nghỉ'
+          reason: 'Giáo viên xin nghỉ',
+          substituteTeacherId: substituteTeacherId || null
         });
         showNotification('Đã xác nhận nghỉ', 'success');
       }
@@ -555,7 +587,7 @@ const Schedule = () => {
   };
 
   const handleCurrentWeek = () => {
-    const week = getCurrentWeekRange();
+    const week = getDefaultViewRange();
     setFilterStartDate(week.start);
     setFilterEndDate(week.end);
   };
@@ -579,6 +611,7 @@ const Schedule = () => {
       fixedSchedule,
       isOnLeave
     });
+    // Reset substitute teacher selection if any (though usually managed in modal)
     setShowLeaveModal(true);
   };
 
@@ -734,6 +767,7 @@ const Schedule = () => {
         onClose={() => setShowLeaveModal(false)}
         selectedSchedule={selectedSchedule}
         handleLeaveSubmit={handleLeaveSubmit}
+        teachers={teachers}
       />
 
       <QuickCreateModal

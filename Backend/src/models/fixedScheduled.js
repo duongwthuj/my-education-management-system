@@ -51,6 +51,11 @@ const fixedScheduleSchema = new Schema(
         },
         notes: {
             type: String
+        },
+        role: {
+            type: String,
+            enum: ['teacher', 'tutor'],
+            default: 'teacher'
         }
     },
     { timestamps: true }

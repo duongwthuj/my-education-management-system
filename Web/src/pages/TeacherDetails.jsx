@@ -30,7 +30,8 @@ const TeacherDetails = () => {
     meetingLink: '',
     notes: '',
     startDate: '', // Ngày bắt đầu (bắt buộc)
-    endDate: '' // Ngày kết thúc (không bắt buộc)
+    endDate: '', // Ngày kết thúc (không bắt buộc)
+    role: 'teacher'
   });
 
   useEffect(() => {
@@ -166,7 +167,8 @@ const TeacherDetails = () => {
         meetingLink: '',
         notes: '',
         startDate: '',
-        endDate: ''
+        endDate: '',
+        role: 'teacher'
       });
       setEditingSchedule(null);
       loadData();
@@ -186,7 +188,8 @@ const TeacherDetails = () => {
       meetingLink: schedule.meetingLink || '',
       notes: schedule.notes || '',
       startDate: schedule.startDate ? schedule.startDate.split('T')[0] : '',
-      endDate: schedule.endDate ? schedule.endDate.split('T')[0] : ''
+      endDate: schedule.endDate ? schedule.endDate.split('T')[0] : '',
+      role: schedule.role || 'teacher'
     });
     setShowScheduleModal(true);
   };
@@ -438,7 +441,8 @@ const TeacherDetails = () => {
                   startTime: '08:00',
                   endTime: '10:00',
                   meetingLink: '',
-                  notes: ''
+                  notes: '',
+                  role: 'teacher'
                 });
                 setShowScheduleModal(true);
               }}
@@ -692,6 +696,20 @@ const TeacherDetails = () => {
                     onChange={(e) => setScheduleForm({ ...scheduleForm, className: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vai trò
+                  </label>
+                  <select
+                    value={scheduleForm.role || 'teacher'}
+                    onChange={(e) => setScheduleForm({ ...scheduleForm, role: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="teacher">Giảng chính</option>
+                    <option value="tutor">Trợ giảng</option>
+                  </select>
                 </div>
 
                 <div>

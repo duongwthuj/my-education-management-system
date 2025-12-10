@@ -617,7 +617,12 @@ class OffsetAllocationService {
             for (const schedule of fixedSchedules) {
                 const startMinutes = this.timeToMinutes(schedule.startTime);
                 const endMinutes = this.timeToMinutes(schedule.endTime);
-                const hoursPerSession = (endMinutes - startMinutes) / 60;
+                let hoursPerSession = (endMinutes - startMinutes) / 60;
+
+                // Apply 0.75 multiplier for Tutors (based on schedule role)
+                if (schedule.role === 'tutor') {
+                    hoursPerSession *= 0.75;
+                }
 
                 let sessionsInMonth = 0;
                 const scheduleDayOfWeek = schedule.dayOfWeek;

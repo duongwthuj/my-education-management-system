@@ -74,6 +74,8 @@ const ScheduleList = ({ groupedByTeacher }) => {
                               className={`text-xs px-2 py-1.5 rounded-lg border ${
                                 isEnded 
                                   ? 'bg-gray-100 text-gray-500 border-gray-200' 
+                                  : fs.role === 'tutor'
+                                  ? 'bg-pink-50 text-pink-800 border-pink-200'
                                   : 'bg-primary-50 text-primary-800 border-primary-200'
                               }`}
                             >
