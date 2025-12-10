@@ -6,7 +6,8 @@ import {
   BookOpen,
   Calendar,
   BookMarked,
-  GraduationCap
+  GraduationCap,
+  UserPlus
 } from 'lucide-react';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -18,6 +19,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { path: '/subjects', icon: BookOpen, label: 'Môn học' },
     { path: '/schedule', icon: Calendar, label: 'Lịch làm việc' },
     { path: '/offset-classes', icon: BookMarked, label: 'Lớp Offset' },
+    { path: '/leave-requests', icon: UserPlus, label: 'Yêu cầu nghỉ' },
   ];
 
   const isActive = (path) => {

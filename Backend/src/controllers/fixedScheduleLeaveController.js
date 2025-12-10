@@ -78,47 +78,8 @@ export const createFixedScheduleLeave = async (req, res) => {
             substituteTeacherId: substituteTeacherId || null
         });
 
-        // If substitute teacher is selected, create an Offset Class for them
-        if (substituteTeacherId) {
-            try {
-                let subjectLevelId = fixedSchedule.subjectLevelId;
-
-                if (!subjectLevelId) {
-                    console.warn(`FixedSchedule ${fixedSchedule._id} has no subjectLevelId. Searching for fallback...`);
-                    // Fallback: Find the first level for this subject
-                    const fallbackLevel = await SubjectLevel.findOne({ subjectId: fixedSchedule.subjectId });
-                    if (fallbackLevel) {
-                        subjectLevelId = fallbackLevel._id;
-                        console.log('✅ Found fallback subjectLevelId:', subjectLevelId);
-                    } else {
-                        console.error('❌ No fallback SubjectLevel found for subjectId:', fixedSchedule.subjectId);
-                    }
-                }
-
-                if (subjectLevelId) {
-                    const newOffset = await OffsetClass.create({
-                        subjectLevelId: subjectLevelId,
-                        assignedTeacherId: substituteTeacherId,
-                        className: fixedSchedule.className,
-                        scheduledDate: new Date(date),
-                        startTime: fixedSchedule.startTime,
-                        endTime: fixedSchedule.endTime,
-                        meetingLink: fixedSchedule.meetingLink,
-                        status: 'assigned',
-                        reason: `Dạy thay cho giáo viên ${fixedSchedule.teacherId} (Lý do: ${reason})`,
-                        originalClassId: fixedSchedule._id,
-                        notes: 'Tự động tạo từ yêu cầu xin nghỉ',
-                        type: 'substitute'
-                    });
-                    console.log('✅ Created substitute offset class successfully:', newOffset._id);
-                } else {
-                    console.error('❌ Failed to create substitute offset class: No subjectLevelId found');
-                }
-            } catch (offsetError) {
-                console.error('Error creating substitute offset class:', offsetError);
-                // Don't fail the leave request, just log
-            }
-        }
+        // Logic creates Offset Class removed as per requirement. 
+        // Substitute teacher is now managed directly via FixedScheduleLeave record.
 
         const populatedLeave = await FixedScheduleLeave.findById(leave._id)
             .populate('fixedScheduleId')
@@ -173,33 +134,7 @@ export const deleteFixedScheduleLeave = async (req, res) => {
             });
         }
 
-        // Cleanup associated OffsetClass if exists
-        if (leave.fixedScheduleId && leave.date) {
-            console.log('Attempting to cleanup offset class for leave:', {
-                originalClassId: leave.fixedScheduleId,
-                scheduledDate: leave.date
-            });
-
-            // Use a date range query to be safe with timezones
-            const startOfDay = new Date(leave.date);
-            startOfDay.setHours(0, 0, 0, 0);
-            const endOfDay = new Date(leave.date);
-            endOfDay.setHours(23, 59, 59, 999);
-
-            const offsetClass = await OffsetClass.findOneAndDelete({
-                originalClassId: leave.fixedScheduleId,
-                scheduledDate: {
-                    $gte: startOfDay,
-                    $lte: endOfDay
-                }
-            });
-
-            if (offsetClass) {
-                console.log(`Deleted substitute offset class ${offsetClass._id}`);
-            } else {
-                console.log('No associated substitute offset class found to delete');
-            }
-        }
+        // Cleanup associated OffsetClass logic removed as we no longer create them.
 
         res.status(200).json({
             success: true,

@@ -72,6 +72,24 @@ const ScheduleCalendar = ({
       return false;
     });
 
+    // Get all substitute classes for this teacher on this date
+    const substituteClassesInShift = fixedScheduleLeaves.filter(leave => {
+      if (!leave.substituteTeacherId) return false;
+      const subTeacherId = typeof leave.substituteTeacherId === 'object' ? leave.substituteTeacherId._id : leave.substituteTeacherId;
+      
+      const leaveDateObj = new Date(leave.date);
+      const year = leaveDateObj.getFullYear();
+      const month = String(leaveDateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(leaveDateObj.getDate()).padStart(2, '0');
+      const formattedLeaveDate = `${year}-${month}-${day}`;
+
+      if (subTeacherId === teacherId && formattedLeaveDate === date && leave.fixedScheduleId) {
+        const fsStartMinutes = timeToMinutes(leave.fixedScheduleId.startTime);
+        return fsStartMinutes >= shiftStartMinutes && fsStartMinutes < shiftEndMinutes;
+      }
+      return false;
+    });
+
     // Combine all busy schedules
     const allBusySchedules = [
       ...fixedSchedulesInShift,
@@ -79,6 +97,11 @@ const ScheduleCalendar = ({
         startTime: oc.startTime,
         endTime: oc.endTime,
         isOffsetClass: true
+      })),
+      ...substituteClassesInShift.map(leave => ({
+        startTime: leave.fixedScheduleId.startTime,
+        endTime: leave.fixedScheduleId.endTime,
+        isSubstitute: true
       }))
     ];
 
@@ -250,6 +273,26 @@ const ScheduleCalendar = ({
                       return false;
                     });
 
+                    // Check for substitute teaching
+                    const substituteClasses = fixedScheduleLeaves.filter(leave => {
+                      if (!leave.substituteTeacherId) return false;
+                      const subTeacherId = typeof leave.substituteTeacherId === 'object' ? leave.substituteTeacherId._id : leave.substituteTeacherId;
+                      
+                      const leaveDateObj = new Date(leave.date);
+                      const year = leaveDateObj.getFullYear();
+                      const month = String(leaveDateObj.getMonth() + 1).padStart(2, '0');
+                      const day = String(leaveDateObj.getDate()).padStart(2, '0');
+                      const formattedLeaveDate = `${year}-${month}-${day}`;
+
+                      if (subTeacherId === teacherId && formattedLeaveDate === date && leave.fixedScheduleId) {
+                        const fsStartMinutes = timeToMinutes(leave.fixedScheduleId.startTime);
+                        const shiftStartMinutes = timeToMinutes(shift.startTime);
+                        const shiftEndMinutes = timeToMinutes(shift.endTime);
+                        return fsStartMinutes >= shiftStartMinutes && fsStartMinutes < shiftEndMinutes;
+                      }
+                      return false;
+                    });
+
                     // Calculate free slots if needed
                     // Note: We need allTeachersDetails here, but for simplicity let's assume data.teacher has fixedSchedules
                     // If not, we might need to pass allTeachersDetails as prop
@@ -298,8 +341,18 @@ const ScheduleCalendar = ({
                         });
                       });
 
+                      // Collect all substitute classes
+                      substituteClasses.forEach((leave) => {
+                        allItems.push({
+                          type: 'substitute',
+                          startTime: leave.fixedScheduleId.startTime,
+                          data: leave
+                        });
+                      });
+
                       // Calculate free time slots if there are schedules AND there is a work shift
-                      const freeSlots = (hasFixedSchedules || hasOffsetClasses) && hasWorkShift && allTeachersDetails
+                      const hasSubstituteClasses = substituteClasses.length > 0;
+                      const freeSlots = (hasFixedSchedules || hasOffsetClasses || hasSubstituteClasses) && hasWorkShift && allTeachersDetails
                         ? getFreeTimeSlots(teacherId, date, shift, allTeachersDetails)
                         : [];
 
@@ -343,6 +396,29 @@ const ScheduleCalendar = ({
                                 {fs.startTime}-{fs.endTime}
                               </div>
                             </button>
+                          );
+                        } else if (item.type === 'substitute') {
+                          const leave = item.data;
+                          const fs = leave.fixedScheduleId;
+                          
+                          return (
+                            <div
+                              key={`sub-${idx}`}
+                              className="w-full text-left text-[9px] px-1.5 py-1 rounded border bg-teal-50 text-teal-800 border-teal-200 mb-1 last:mb-0 shadow-sm hover:bg-teal-100 transition-colors"
+                            >
+                              <div className="font-bold truncate flex items-center gap-1">
+                                🆘 Dạy thay
+                              </div>
+                              <div className="font-medium truncate text-teal-700">
+                                {fs.subjectId?.name || 'N/A'} - {fs.className}
+                              </div>
+                              <div className="text-[8px] text-teal-600">
+                                {fs.startTime}-{fs.endTime}
+                              </div>
+                              <div className="text-[7px] text-teal-500 truncate" title={`Dạy thay cho ${leave.teacherId?.name || 'giáo viên'}`}>
+                                GV: {leave.teacherId?.name || '...'}
+                              </div>
+                            </div>
                           );
                         } else if (item.type === 'offset') {
                           const oc = item.data;

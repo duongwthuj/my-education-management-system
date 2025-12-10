@@ -146,6 +146,28 @@ export const getTeachingHoursStats = async (req, res) => {
         fixedHours += hoursPerClass * actualOccurrences;
       }
 
+      // Calculate substitute hours from FixedScheduleLeaves
+      const FixedScheduleLeave = (await import('../models/fixedScheduleLeave.js')).default;
+      const substituteLeaves = await FixedScheduleLeave.find({
+        substituteTeacherId: teacher._id,
+        date: {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate)
+        }
+      }).populate('fixedScheduleId').lean();
+
+      let substituteHours = 0;
+      substituteLeaves.forEach(leave => {
+        if (leave.fixedScheduleId) {
+          let hours = calculateHours(leave.fixedScheduleId.startTime, leave.fixedScheduleId.endTime);
+          // Apply multiplier if role is tutor
+          if (leave.fixedScheduleId.role === 'tutor') {
+            hours *= 0.75;
+          }
+          substituteHours += hours;
+        }
+      });
+
       // Calculate offset hours
       let offsetHours = 0;
       offsetClasses.forEach(offsetClass => {
@@ -154,17 +176,19 @@ export const getTeachingHoursStats = async (req, res) => {
         offsetHours += hours;
       });
 
-      const totalHours = fixedHours + offsetHours;
+      const totalHours = fixedHours + offsetHours + substituteHours;
 
       teacherStats.push({
         teacherId: teacher._id,
         teacherName: teacher.name,
         teacherEmail: teacher.email,
         fixedHours: Math.round(fixedHours * 10) / 10,
+        substituteHours: Math.round(substituteHours * 10) / 10,
         offsetHours: Math.round(offsetHours * 10) / 10,
         totalHours: Math.round(totalHours * 10) / 10,
         fixedClassCount: fixedSchedules.length,
-        offsetClassCount: offsetClasses.length
+        offsetClassCount: offsetClasses.length,
+        substituteClassCount: substituteLeaves.length
       });
     }
 
@@ -177,6 +201,7 @@ export const getTeachingHoursStats = async (req, res) => {
       summary: {
         totalTeachers: teacherStats.length,
         totalFixedHours: Math.round(teacherStats.reduce((sum, t) => sum + t.fixedHours, 0) * 10) / 10,
+        totalSubstituteHours: Math.round(teacherStats.reduce((sum, t) => sum + t.substituteHours, 0) * 10) / 10,
         totalOffsetHours: Math.round(teacherStats.reduce((sum, t) => sum + t.offsetHours, 0) * 10) / 10,
         totalHours: Math.round(teacherStats.reduce((sum, t) => sum + t.totalHours, 0) * 10) / 10
       }
@@ -261,6 +286,36 @@ export const getTeacherHoursDetail = async (req, res) => {
       });
     }
 
+    // Get substitute teaching details
+    const FixedScheduleLeave = (await import('../models/fixedScheduleLeave.js')).default;
+    const substituteLeaves = await FixedScheduleLeave.find({
+      substituteTeacherId: teacherId,
+      date: {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      }
+    }).populate('fixedScheduleId').lean();
+
+    const substituteDetails = [];
+    substituteLeaves.forEach(leave => {
+      if (leave.fixedScheduleId) {
+        let hours = calculateHours(leave.fixedScheduleId.startTime, leave.fixedScheduleId.endTime);
+        // Apply multiplier if role is tutor
+        if (leave.fixedScheduleId.role === 'tutor') {
+          hours *= 0.75;
+        }
+
+        substituteDetails.push({
+          className: leave.fixedScheduleId.className,
+          subject: 'Dạy thay', // Could populate subject if needed
+          date: leave.date,
+          timeSlot: `${leave.fixedScheduleId.startTime} - ${leave.fixedScheduleId.endTime}`,
+          hours: Math.round(hours * 10) / 10,
+          status: 'substitute'
+        });
+      }
+    });
+
     // Get offset classes with details (bao gồm cả pending và assigned để tính đúng workload)
     const offsetClasses = await OffsetClass.find({
       assignedTeacherId: teacherId,
@@ -296,6 +351,8 @@ export const getTeacherHoursDetail = async (req, res) => {
     const fixedHours = fixedScheduleDetails.reduce((sum, s) => sum + s.totalHours, 0);
     const offsetHours = offsetClassDetails.reduce((sum, s) => sum + s.hours, 0);
 
+    const substituteHours = substituteDetails.reduce((sum, s) => sum + s.hours, 0);
+
     res.status(200).json({
       success: true,
       data: {
@@ -306,12 +363,15 @@ export const getTeacherHoursDetail = async (req, res) => {
         },
         fixedSchedules: fixedScheduleDetails,
         offsetClasses: offsetClassDetails,
+        substituteClasses: substituteDetails,
         summary: {
           fixedHours: Math.round(fixedHours * 10) / 10,
           offsetHours: Math.round(offsetHours * 10) / 10,
-          totalHours: Math.round((fixedHours + offsetHours) * 10) / 10,
+          substituteHours: Math.round(substituteHours * 10) / 10,
+          totalHours: Math.round((fixedHours + offsetHours + substituteHours) * 10) / 10,
           fixedClassCount: fixedSchedules.length,
-          offsetClassCount: offsetClasses.length
+          offsetClassCount: offsetClasses.length,
+          substituteClassCount: substituteDetails.length
         }
       }
     });
