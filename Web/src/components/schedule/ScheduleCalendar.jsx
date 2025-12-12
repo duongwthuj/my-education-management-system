@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit, Trash2, X } from 'lucide-react';
+import { Edit, Trash2, X, Plus } from 'lucide-react';
 import Card from '../ui/Card';
 
 const ScheduleCalendar = ({ 
@@ -13,7 +13,15 @@ const ScheduleCalendar = ({
   onScheduleClick,
   onEditOffset,
   onCancelOffset,
-  onDeleteOffset
+  onDeleteOffset,
+
+  supplementaryClasses = [], // Default to empty array
+  testClasses = [], // Default to empty array
+  onAddOffset, // New prop
+  onEditSupplementary,
+  onDeleteSupplementary,
+  onEditTest,
+  onDeleteTest
 }) => {
   
   // Helper: Convert time string to minutes
@@ -26,7 +34,7 @@ const ScheduleCalendar = ({
   const hasSignificantGap = (endTime, startTime) => {
     const endMinutes = timeToMinutes(endTime);
     const startMinutes = timeToMinutes(startTime);
-    return startMinutes - endMinutes >= 60;
+    return startMinutes - endMinutes >= 30;
   };
 
   // Helper: Calculate free time slots (>= 1 hour)
@@ -46,6 +54,18 @@ const ScheduleCalendar = ({
     // Get all fixed schedules that start in this shift
     const fixedSchedulesInShift = teacher.fixedSchedules.filter(fs => {
       if (fs.dayOfWeek !== dayName) return false;
+      
+      // Check if on leave
+      const isOnLeave = fixedScheduleLeaves.some(leave => {
+        const leaveScheduleId = typeof leave.fixedScheduleId === 'object' ? leave.fixedScheduleId?._id : leave.fixedScheduleId;
+        const leaveDate = new Date(leave.date).toISOString().split('T')[0];
+        // Compare date and schedule ID
+        // Note: 'date' argument to getFreeTimeSlots comes from weekDates.map which are YYYY-MM-DD strings
+        return leaveScheduleId === fs._id && leaveDate === date;
+      });
+      
+      if (isOnLeave) return false;
+
       const fsStartMinutes = timeToMinutes(fs.startTime);
       return fsStartMinutes >= shiftStartMinutes && fsStartMinutes < shiftEndMinutes;
     });
@@ -90,6 +110,45 @@ const ScheduleCalendar = ({
       return false;
     });
 
+    // Get all supplementary classes for this teacher on this date
+    const supplementaryClassesInShift = supplementaryClasses.filter(sc => {
+      // Check for assigned teacher directly
+      if (!sc.assignedTeacherId || (sc.status !== 'pending' && sc.status !== 'assigned' && sc.status !== 'completed')) return false;
+
+      const scTeacherId = typeof sc.assignedTeacherId === 'object' ? sc.assignedTeacherId._id : sc.assignedTeacherId;
+
+      const scDateObj = new Date(sc.scheduledDate);
+      const year = scDateObj.getFullYear();
+      const month = String(scDateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(scDateObj.getDate()).padStart(2, '0');
+      const formattedScDate = `${year}-${month}-${day}`;
+
+      if (scTeacherId === teacherId && formattedScDate === date) {
+        const scStartMinutes = timeToMinutes(sc.startTime);
+        return scStartMinutes >= shiftStartMinutes && scStartMinutes < shiftEndMinutes;
+      }
+      return false;
+    });
+
+    // Get all test classes for this teacher on this date
+    const testClassesInShift = testClasses.filter(tc => {
+      if (!tc.assignedTeacherId || (tc.status !== 'pending' && tc.status !== 'assigned' && tc.status !== 'completed')) return false;
+
+      const tcTeacherId = typeof tc.assignedTeacherId === 'object' ? tc.assignedTeacherId._id : tc.assignedTeacherId;
+
+      const tcDateObj = new Date(tc.scheduledDate);
+      const year = tcDateObj.getFullYear();
+      const month = String(tcDateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(tcDateObj.getDate()).padStart(2, '0');
+      const formattedTcDate = `${year}-${month}-${day}`;
+
+      if (tcTeacherId === teacherId && formattedTcDate === date) {
+        const tcStartMinutes = timeToMinutes(tc.startTime);
+        return tcStartMinutes >= shiftStartMinutes && tcStartMinutes < shiftEndMinutes;
+      }
+      return false;
+    });
+
     // Combine all busy schedules
     const allBusySchedules = [
       ...fixedSchedulesInShift,
@@ -97,6 +156,16 @@ const ScheduleCalendar = ({
         startTime: oc.startTime,
         endTime: oc.endTime,
         isOffsetClass: true
+      })),
+      ...supplementaryClassesInShift.map(sc => ({
+        startTime: sc.startTime,
+        endTime: sc.endTime,
+        isSupplementaryClass: true
+      })),
+      ...testClassesInShift.map(tc => ({
+        startTime: tc.startTime,
+        endTime: tc.endTime,
+        isTestClass: true
       })),
       ...substituteClassesInShift.map(leave => ({
         startTime: leave.fixedScheduleId.startTime,
@@ -162,6 +231,19 @@ const ScheduleCalendar = ({
     return freeSlots;
   };
 
+  // Duplicate helper from Dashboard.jsx (Consider moving to utils if used elsewhere)
+  const abbreviateName = (name) => {
+    if (!name) return '';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0];
+    
+    const initials = parts.slice(0, parts.length - 1).map(p => p.charAt(0).toUpperCase()).join('');
+    const lastName = parts[parts.length - 1];
+    const formattedLastName = lastName.charAt(0).toUpperCase() + lastName.slice(1);
+    
+    return `${initials}${formattedLastName}`;
+  };
+
   return (
     <Card noPadding className="overflow-hidden">
       <div className="p-4 border-b border-secondary-200 bg-secondary-50 flex items-center justify-between">
@@ -170,27 +252,39 @@ const ScheduleCalendar = ({
         {/* Legend */}
         <div className="flex items-center gap-3 text-xs">
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 bg-success-100 border border-success-300 rounded"></div>
+            <div className="w-2.5 h-2.5 bg-success-200 border border-success-400 rounded"></div>
             <span className="text-secondary-600">Rảnh</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 bg-primary-100 border border-primary-300 rounded"></div>
+            <div className="w-2.5 h-2.5 bg-sky-300 border border-sky-500 rounded"></div>
             <span className="text-secondary-600">Giảng chính</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 bg-pink-100 border border-pink-300 rounded"></div>
+            <div className="w-2.5 h-2.5 bg-indigo-200 border border-indigo-400 rounded"></div>
             <span className="text-secondary-600">Trợ giảng</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 bg-purple-100 border border-purple-300 rounded"></div>
+            <div className="w-2.5 h-2.5 bg-purple-200 border border-purple-400 rounded"></div>
             <span className="text-secondary-600">Lớp offset</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 bg-warning-100 border border-warning-300 rounded"></div>
+            <div className="w-2.5 h-2.5 bg-amber-200 border border-amber-400 rounded"></div>
+            <span className="text-secondary-600">Lớp bổ trợ</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 bg-blue-200 border border-blue-400 rounded"></div>
+            <span className="text-secondary-600">Lớp test</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 bg-yellow-200 border border-yellow-400 rounded"></div>
+            <span className="text-secondary-600">Dạy thay</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 bg-red-300 border border-red-500 rounded"></div>
             <span className="text-secondary-600">Xin nghỉ</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 bg-secondary-100 border border-secondary-300 rounded"></div>
+            <div className="w-2.5 h-2.5 bg-secondary-200 border border-secondary-400 rounded"></div>
             <span className="text-secondary-600">Bận</span>
           </div>
         </div>
@@ -232,7 +326,7 @@ const ScheduleCalendar = ({
                         <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-xs font-bold">
                           {data.teacher?.name?.charAt(0)}
                         </div>
-                        <span className="truncate">{data.teacher?.name || 'Unknown'}</span>
+                        <span className="truncate" title={data.teacher?.name}>{abbreviateName(data.teacher?.name) || 'Unknown'}</span>
                       </div>
                     </td>
                   )}
@@ -341,6 +435,64 @@ const ScheduleCalendar = ({
                         });
                       });
 
+                      // Collect all supplementary classes
+                      const teacherSupplementaryClasses = supplementaryClasses.filter(sc => {
+                        if (!sc.assignedTeacherId || (sc.status !== 'pending' && sc.status !== 'assigned' && sc.status !== 'completed')) return false;
+                        const scTeacherId = typeof sc.assignedTeacherId === 'object' ? sc.assignedTeacherId._id : sc.assignedTeacherId;
+                        
+                        const scDateObj = new Date(sc.scheduledDate);
+                        const year = scDateObj.getFullYear();
+                        const month = String(scDateObj.getMonth() + 1).padStart(2, '0');
+                        const day = String(scDateObj.getDate()).padStart(2, '0');
+                        const formattedScDate = `${year}-${month}-${day}`;
+                        
+                        if (scTeacherId === teacherId && formattedScDate === date) {
+                          const scStartMinutes = timeToMinutes(sc.startTime);
+                          const shiftStartMinutes = timeToMinutes(shift.startTime);
+                          const shiftEndMinutes = timeToMinutes(shift.endTime);
+                          return scStartMinutes >= shiftStartMinutes && scStartMinutes < shiftEndMinutes;
+                        }
+                        return false;
+                      });
+
+                      teacherSupplementaryClasses.forEach((sc) => {
+                        allItems.push({
+                          type: 'supplementary',
+                          startTime: sc.startTime,
+                          data: sc
+                        });
+                      });
+
+                      // Collect all test classes
+                      const teacherTestClasses = testClasses.filter(tc => {
+                        if (!tc.assignedTeacherId || (tc.status !== 'pending' && tc.status !== 'assigned' && tc.status !== 'completed')) {
+                          return false;
+                        }
+                        const tcTeacherId = typeof tc.assignedTeacherId === 'object' ? tc.assignedTeacherId._id : tc.assignedTeacherId;
+                        
+                        const tcDateObj = new Date(tc.scheduledDate);
+                        const year = tcDateObj.getFullYear();
+                        const month = String(tcDateObj.getMonth() + 1).padStart(2, '0');
+                        const day = String(tcDateObj.getDate()).padStart(2, '0');
+                        const formattedTcDate = `${year}-${month}-${day}`;
+                        
+                        if (tcTeacherId === teacherId && formattedTcDate === date) {
+                          const tcStartMinutes = timeToMinutes(tc.startTime);
+                          const shiftStartMinutes = timeToMinutes(shift.startTime);
+                          const shiftEndMinutes = timeToMinutes(shift.endTime);
+                          return tcStartMinutes >= shiftStartMinutes && tcStartMinutes < shiftEndMinutes;
+                        }
+                        return false;
+                      });
+
+                      teacherTestClasses.forEach((tc) => {
+                        allItems.push({
+                          type: 'test',
+                          startTime: tc.startTime,
+                          data: tc
+                        });
+                      });
+
                       // Collect all substitute classes
                       substituteClasses.forEach((leave) => {
                         allItems.push({
@@ -352,7 +504,9 @@ const ScheduleCalendar = ({
 
                       // Calculate free time slots if there are schedules AND there is a work shift
                       const hasSubstituteClasses = substituteClasses.length > 0;
-                      const freeSlots = (hasFixedSchedules || hasOffsetClasses || hasSubstituteClasses) && hasWorkShift && allTeachersDetails
+                      const hasSupplementaryClasses = teacherSupplementaryClasses.length > 0;
+                      const hasTestClasses = teacherTestClasses.length > 0;
+                      const freeSlots = (hasFixedSchedules || hasOffsetClasses || hasSubstituteClasses || hasSupplementaryClasses || hasTestClasses) && hasWorkShift && allTeachersDetails
                         ? getFreeTimeSlots(teacherId, date, shift, allTeachersDetails)
                         : [];
 
@@ -380,19 +534,19 @@ const ScheduleCalendar = ({
                               onClick={(e) => { e.stopPropagation(); onScheduleClick(teacherId, date, shift, fs, isOnLeave); }}
                               className={`w-full text-left text-[9px] px-1.5 py-1 rounded border transition-all mb-1 last:mb-0 shadow-sm ${
                                 isOnLeave
-                                  ? 'bg-warning-50 text-warning-800 border-warning-200 hover:bg-warning-100'
+                                  ? 'bg-red-200 text-red-900 border-red-400 hover:bg-red-300'
                                   : item.isEnded
-                                  ? 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                                  ? 'bg-gray-200 text-gray-600 border-gray-300 hover:bg-gray-300'
                                   : fs.role === 'tutor'
-                                  ? 'bg-pink-50 text-pink-800 border-pink-200 hover:bg-pink-100'
-                                  : 'bg-primary-50 text-primary-800 border-primary-200 hover:bg-primary-100'
+                                  ? 'bg-indigo-100 text-indigo-900 border-indigo-300 hover:bg-indigo-200'
+                                  : 'bg-sky-200 text-sky-900 border-sky-400 hover:bg-sky-300'
                               }`}
                             >
                               <div className="font-bold truncate flex items-center gap-1">
                                 {isOnLeave ? '🏖️' : item.isEnded ? '🏁' : '📚'} {fs.subjectId?.name || 'N/A'}
                                 {item.isEnded && <span className="text-[7px] bg-gray-200 px-1 rounded text-gray-600 ml-auto">Kết thúc</span>}
                               </div>
-                              <div className={`text-[8px] ${isOnLeave ? 'text-warning-600' : item.isEnded ? 'text-gray-400' : 'text-primary-600'}`}>
+                              <div className={`text-[8px] ${isOnLeave ? 'text-red-600' : item.isEnded ? 'text-gray-400' : 'text-sky-600'}`}>
                                 {fs.startTime}-{fs.endTime}
                               </div>
                             </button>
@@ -404,19 +558,42 @@ const ScheduleCalendar = ({
                           return (
                             <div
                               key={`sub-${idx}`}
-                              className="w-full text-left text-[9px] px-1.5 py-1 rounded border bg-teal-50 text-teal-800 border-teal-200 mb-1 last:mb-0 shadow-sm hover:bg-teal-100 transition-colors"
+                              className="w-full text-left text-[9px] px-1.5 py-1 rounded border bg-yellow-100 text-yellow-900 border-yellow-300 mb-1 last:mb-0 shadow-sm hover:bg-yellow-200 transition-colors"
                             >
                               <div className="font-bold truncate flex items-center gap-1">
                                 🆘 Dạy thay
                               </div>
-                              <div className="font-medium truncate text-teal-700">
+                              <div className="font-medium truncate text-yellow-700">
                                 {fs.subjectId?.name || 'N/A'} - {fs.className}
                               </div>
-                              <div className="text-[8px] text-teal-600">
+                              <div className="text-[8px] text-yellow-600">
                                 {fs.startTime}-{fs.endTime}
                               </div>
-                              <div className="text-[7px] text-teal-500 truncate" title={`Dạy thay cho ${leave.teacherId?.name || 'giáo viên'}`}>
+                              <div className="text-[7px] text-yellow-500 truncate" title={`Dạy thay cho ${leave.teacherId?.name || 'giáo viên'}`}>
                                 GV: {leave.teacherId?.name || '...'}
+                              </div>
+                            </div>
+                          );
+                        } else if (item.type === 'supplementary') {
+                          const sc = item.data;
+                          
+                          return (
+                            <div
+                              key={`supp-${idx}`}
+                              className="w-full text-left text-[9px] px-1.5 py-1 rounded border bg-amber-100 text-amber-900 border-amber-300 relative group mb-1 last:mb-0 shadow-sm hover:border-amber-400 transition-all"
+                            >
+                              <div className="absolute top-0.5 right-0.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 rounded px-0.5 backdrop-blur-sm">
+                                <button onClick={(e) => { e.stopPropagation(); onEditSupplementary && onEditSupplementary(sc); }} className="p-0.5 text-amber-600 hover:text-amber-700"><Edit className="w-2.5 h-2.5" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); onDeleteSupplementary && onDeleteSupplementary(sc); }} className="p-0.5 text-danger-600 hover:text-danger-700"><Trash2 className="w-2.5 h-2.5" /></button>
+                              </div>
+                              <div className="font-bold truncate pr-8 flex items-center gap-1">
+                                🌱 {sc.className || 'Bổ trợ'}
+                              </div>
+                              <div className="text-[8px] text-amber-600">
+                                {sc.startTime}-{sc.endTime}
+                              </div>
+                              <div className="text-[7px] text-amber-500 truncate">
+                                {sc.subjectLevelId?.subjectId?.name}
                               </div>
                             </div>
                           );
@@ -426,7 +603,7 @@ const ScheduleCalendar = ({
                           return (
                             <div
                               key={`offset-${idx}`}
-                              className="w-full text-left text-[9px] px-1.5 py-1 rounded border bg-purple-50 text-purple-800 border-purple-200 relative group mb-1 last:mb-0 shadow-sm hover:border-purple-300 transition-all"
+                              className="w-full text-left text-[9px] px-1.5 py-1 rounded border bg-purple-100 text-purple-900 border-purple-300 relative group mb-1 last:mb-0 shadow-sm hover:border-purple-400 transition-all"
                             >
                               <div className="absolute top-0.5 right-0.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 rounded px-0.5 backdrop-blur-sm">
                                 <button onClick={(e) => { e.stopPropagation(); onEditOffset(oc); }} className="p-0.5 text-primary-600 hover:text-primary-700"><Edit className="w-2.5 h-2.5" /></button>
@@ -444,14 +621,49 @@ const ScheduleCalendar = ({
                               </div>
                             </div>
                           );
+                        } else if (item.type === 'test') {
+                          const tc = item.data;
+                          
+                          return (
+                            <div
+                              key={`test-${idx}`}
+                              className="w-full text-left text-[9px] px-1.5 py-1 rounded border bg-blue-100 text-blue-900 border-blue-300 relative group mb-1 last:mb-0 shadow-sm hover:border-blue-400 transition-all"
+                            >
+                              <div className="absolute top-0.5 right-0.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 rounded px-0.5 backdrop-blur-sm">
+                                <button onClick={(e) => { e.stopPropagation(); onEditTest && onEditTest(tc); }} className="p-0.5 text-blue-600 hover:text-blue-700"><Edit className="w-2.5 h-2.5" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); onDeleteTest && onDeleteTest(tc); }} className="p-0.5 text-danger-600 hover:text-danger-700"><Trash2 className="w-2.5 h-2.5" /></button>
+                              </div>
+                              <div className="font-bold truncate pr-8 flex items-center gap-1">
+                                📝 {tc.className || 'Test'}
+                              </div>
+                              <div className="text-[8px] text-blue-600">
+                                {tc.startTime}-{tc.endTime}
+                              </div>
+                              <div className="text-[7px] text-blue-500 truncate">
+                                {tc.subjectId?.name}
+                              </div>
+                            </div>
+                          );
                         } else if (item.type === 'free') {
                           const slot = item.data;
                           
                           return (
                             <div
                               key={`free-${idx}`}
-                              className="w-full text-left text-[9px] px-1.5 py-1 rounded border bg-success-50 text-success-800 border-success-200 mb-1 last:mb-0 shadow-sm"
+                              className="w-full text-left text-[9px] px-1.5 py-1 rounded border bg-success-50 text-success-800 border-success-200 mb-1 last:mb-0 shadow-sm group relative"
                             >
+                              <div className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onAddOffset(teacherId, date, slot.start, slot.end);
+                                  }}
+                                  className="p-0.5 bg-white rounded border border-success-200 text-success-600 hover:bg-success-100"
+                                  title="Thêm lớp Offset"
+                                >
+                                  <Plus className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
                               <div className="font-bold truncate flex items-center gap-1">
                                 ⏰ Rảnh
                               </div>
@@ -468,7 +680,7 @@ const ScheduleCalendar = ({
                         return (
                           <div className={`text-[10px] px-1.5 py-1 rounded border font-medium text-center ${
                             workShift.isOnLeave
-                              ? 'bg-warning-50 text-warning-800 border-warning-200'
+                              ? 'bg-red-100 text-red-900 border-red-300'
                               : workShift.isAvailable 
                               ? 'bg-success-50 text-success-800 border-success-200' 
                               : 'bg-secondary-100 text-secondary-600 border-secondary-200'

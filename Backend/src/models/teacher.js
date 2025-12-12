@@ -25,6 +25,12 @@ const teacherSchema = new Schema(
             enum: ['active', 'inactive', 'on_leave'],
             default: 'active'
         },
+        role: {
+            type: String,
+            enum: ['fulltime', 'parttime'],
+            default: 'fulltime',
+            required: true
+        },
         qualifications: [{
             degree: String,
             institution: String,

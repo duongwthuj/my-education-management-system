@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Zap, RefreshCw, Check, X, Eye, Edit, Trash2, AlertCircle, CheckCircle, Info, BookMarked, TrendingUp, Search, Filter, MoreVertical, Calendar, Clock } from 'lucide-react';
-import { offsetClassesAPI, teachersAPI, subjectsAPI } from '../services/api';
+import { Plus, Zap, RefreshCw, Check, X, Eye, Edit, Trash2, AlertCircle, CheckCircle, Info, BookMarked, TrendingUp, Search, Filter, MoreVertical, Calendar, Clock, Layers } from 'lucide-react';
+import { testClassesAPI, teachersAPI, subjectsAPI } from '../services/api';
 import { format } from 'date-fns';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 
-const OffsetClasses = () => {
-  const [offsetClasses, setOffsetClasses] = useState([]);
+const TestClasses = () => {
+  const [testClasses, setTestClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
-  const [subjectLevels, setSubjectLevels] = useState([]);
+  /* const [subjectLevels, setSubjectLevels] = useState([]); */ // Removed subjectLevels
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
-    subjectLevelId: '',
+    subjectId: '',
     className: '',
     scheduledDate: '',
     startTime: '',
@@ -40,7 +40,7 @@ const OffsetClasses = () => {
   const [notification, setNotification] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [showAll, setShowAll] = useState(true);
-  const [activeSubjectId, setActiveSubjectId] = useState('');
+  /* const [activeSubjectId, setActiveSubjectId] = useState(''); */ // Removed activeSubjectId
 
   // Auto hide notification after 5 seconds
   useEffect(() => {
@@ -92,17 +92,16 @@ const OffsetClasses = () => {
         params.limit = 50;
       }
       
-      const [offsetRes, teachersRes, subjectsRes, levelsRes] = await Promise.all([
-        offsetClassesAPI.getAll(params),
+      const [suppRes, teachersRes, subjectsRes] = await Promise.all([
+        testClassesAPI.getAll(params),
         teachersAPI.getAll({ limit: 1000 }),
         subjectsAPI.getAll(),
-        subjectsAPI.getAllLevels(),
       ]);
 
-      setOffsetClasses(offsetRes.data || []);
+      setTestClasses(suppRes.data || []);
       setTeachers(teachersRes.data || []);
       setSubjects(subjectsRes.data || []);
-      setSubjectLevels(levelsRes.data || []);
+      /* setSubjectLevels(levelsRes.data || []); */ // Removed
       setLoading(false);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -121,35 +120,35 @@ const OffsetClasses = () => {
           updateData.assignedTeacherId = null;
           updateData.status = 'pending';
         } else {
-          updateData.status = 'assigned';
+          updateData.status = 'pending';
         }
         
-        await offsetClassesAPI.update(editingId, updateData);
-        showNotification('Lớp offset đã được cập nhật thành công!', 'success');
+        await testClassesAPI.update(editingId, updateData);
+        showNotification('Lớp test đã được cập nhật thành công!', 'success');
       } else {
         const createData = { ...formData };
         if (!createData.assignedTeacherId || createData.assignedTeacherId === '') {
           createData.assignedTeacherId = null;
           delete createData.assignedTeacherId;
           
-          const response = await offsetClassesAPI.createWithAssignment(createData);
+          const response = await testClassesAPI.createWithAssignment(createData);
 
           if (response.autoAssigned) {
-            showNotification('Lớp offset đã được tạo và tự động phân công giáo viên thành công!', 'success');
+            showNotification('Lớp test đã được tạo và tự động phân công giáo viên thành công!', 'success');
           } else {
-            showNotification('Lớp offset đã được tạo nhưng không tìm thấy giáo viên phù hợp. Vui lòng kiểm tra lại thời gian hoặc phân công thủ công.', 'warning');
+            showNotification('Lớp test đã được tạo nhưng không tìm thấy giáo viên phù hợp. Vui lòng kiểm tra lại thời gian hoặc phân công thủ công.', 'warning');
           }
         } else {
-          createData.status = 'assigned';
-          const response = await offsetClassesAPI.create(createData);
-          showNotification('Lớp offset đã được tạo và phân công giáo viên thành công!', 'success');
+          createData.status = 'pending';
+          const response = await testClassesAPI.create(createData);
+          showNotification('Lớp test đã được tạo và phân công giáo viên thành công!', 'success');
         }
       }
 
       handleCloseModal();
       loadData();
     } catch (error) {
-      console.error('Error saving offset class:', error);
+      console.error('Error saving test class:', error);
       if (error.message.includes('No suitable teacher found')) {
         showNotification('Không tìm thấy giáo viên phù hợp! Vui lòng kiểm tra lại thời gian hoặc phân công thủ công.', 'error');
       } else {
@@ -163,13 +162,13 @@ const OffsetClasses = () => {
   const handleAutoAssign = async (id) => {
     showConfirm('Bạn có muốn tự động phân công giáo viên cho lớp này?', async () => {
       try {
-        const response = await offsetClassesAPI.autoAssign(id);
+        const response = await testClassesAPI.autoAssign(id);
         if (response.success && response.data) {
-          setOffsetClasses(prev => 
-            prev.map(oc => 
-              oc._id === id 
-                ? { ...oc, ...response.data, status: 'assigned' }
-                : oc
+          setTestClasses(prev => 
+            prev.map(sc => 
+              sc._id === id 
+                ? { ...sc, ...response.data, status: 'pending' }
+                : sc
             )
           );
         }
@@ -186,48 +185,10 @@ const OffsetClasses = () => {
     });
   };
 
-  const handleAutoAssignAll = async () => {
-    const pendingClasses = offsetClasses.filter(
-      oc => oc.status === 'pending' && !oc.assignedTeacherId
-    );
-
-    if (pendingClasses.length === 0) {
-      showNotification('Không có lớp nào cần phân công!', 'info');
-      return;
-    }
-
-    showConfirm(`Bạn có muốn tự động phân công ${pendingClasses.length} lớp đang chờ xử lý?`, async () => {
-      setAutoAssigning(true);
-      let successCount = 0;
-      let failCount = 0;
-
-      try {
-        for (const offsetClass of pendingClasses) {
-          try {
-            await offsetClassesAPI.autoAssign(offsetClass._id);
-            successCount++;
-          } catch (error) {
-            console.error(`Failed to assign class ${offsetClass._id}:`, error);
-            failCount++;
-          }
-        }
-
-        const message = `Hoàn tất! Thành công: ${successCount} lớp, Thất bại: ${failCount} lớp`;
-        showNotification(message, failCount === 0 ? 'success' : 'warning');
-        loadData();
-      } catch (error) {
-        console.error('Error in auto assign all:', error);
-        showNotification(`Có lỗi xảy ra: ${error.message}`, 'error');
-      } finally {
-        setAutoAssigning(false);
-      }
-    });
-  };
-
   const handleReallocate = async (id) => {
     showConfirm('Bạn có muốn tái phân bổ giáo viên khác?', async () => {
       try {
-        await offsetClassesAPI.reallocate(id);
+        await testClassesAPI.reallocate(id);
         showNotification('Đã tái phân bổ giáo viên thành công!', 'success');
         loadData();
       } catch (error) {
@@ -239,7 +200,7 @@ const OffsetClasses = () => {
 
   const handleMarkCompleted = async (id) => {
     try {
-      await offsetClassesAPI.markCompleted(id);
+      await testClassesAPI.markCompleted(id);
       showNotification('Đã đánh dấu hoàn thành!', 'success');
       loadData();
     } catch (error) {
@@ -253,8 +214,8 @@ const OffsetClasses = () => {
     if (!reason) return;
 
     try {
-      await offsetClassesAPI.cancel(id, reason);
-      showNotification('Đã hủy lớp offset!', 'success');
+      await testClassesAPI.cancel(id, reason);
+      showNotification('Đã hủy lớp test!', 'success');
       loadData();
     } catch (error) {
       console.error('Error cancelling:', error);
@@ -262,28 +223,28 @@ const OffsetClasses = () => {
     }
   };
 
-  const handleEdit = (offsetClass) => {
-    setEditingId(offsetClass._id);
-    setActiveSubjectId(offsetClass.subjectLevelId?.subjectId?._id || '');
+  const handleEdit = (suppClass) => {
+    setEditingId(suppClass._id);
+    setActiveSubjectId(suppClass.subjectId?._id || '');
     setFormData({
-      subjectLevelId: offsetClass.subjectLevelId?._id || '',
-      className: offsetClass.className || '',
-      scheduledDate: format(new Date(offsetClass.scheduledDate), 'yyyy-MM-dd'),
-      startTime: offsetClass.startTime || '',
-      endTime: offsetClass.endTime || '',
-      reason: offsetClass.reason || '',
-      meetingLink: offsetClass.meetingLink || '',
-      notes: offsetClass.notes || '',
-      assignedTeacherId: offsetClass.assignedTeacherId?._id || '',
+      subjectId: suppClass.subjectId?._id || '',
+      className: suppClass.className || '',
+      scheduledDate: format(new Date(suppClass.scheduledDate), 'yyyy-MM-dd'),
+      startTime: suppClass.startTime || '',
+      endTime: suppClass.endTime || '',
+      reason: suppClass.reason || '',
+      meetingLink: suppClass.meetingLink || '',
+      notes: suppClass.notes || '',
+      assignedTeacherId: suppClass.assignedTeacherId?._id || '',
     });
     setShowModal(true);
   };
 
   const handleDelete = async (id) => {
-    showConfirm('Bạn có chắc chắn muốn xóa lớp offset này?', async () => {
+    showConfirm('Bạn có chắc chắn muốn xóa lớp test này?', async () => {
       try {
-        await offsetClassesAPI.delete(id);
-        showNotification('Đã xóa lớp offset thành công!', 'success');
+        await testClassesAPI.delete(id);
+        showNotification('Đã xóa lớp test thành công!', 'success');
         loadData();
       } catch (error) {
         console.error('Error deleting:', error);
@@ -296,7 +257,7 @@ const OffsetClasses = () => {
     setShowModal(false);
     setEditingId(null);
     setFormData({
-      subjectLevelId: '',
+      subjectId: '',
       className: '',
       scheduledDate: '',
       startTime: '',
@@ -317,14 +278,16 @@ const OffsetClasses = () => {
     };
     const labels = {
       pending: 'Chờ xử lý',
-      assigned: 'Đã phân công',
       completed: 'Hoàn thành',
       cancelled: 'Đã hủy',
     };
     
+    // If status is 'assigned', treat as 'pending' for display
+    const effectiveStatus = status === 'assigned' ? 'pending' : status;
+
     return (
-      <Badge variant={variants[status] || 'neutral'}>
-        {labels[status] || status}
+      <Badge variant={variants[effectiveStatus] || 'neutral'}>
+        {labels[effectiveStatus] || status}
       </Badge>
     );
   };
@@ -410,25 +373,15 @@ const OffsetClasses = () => {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-secondary-900">Quản lý Lớp Offset</h1>
-          <p className="text-secondary-500 mt-1">Quản lý và phân công lớp bù</p>
+          <h1 className="text-2xl font-bold text-secondary-900">Quản lý Lớp Test</h1>
+          <p className="text-secondary-500 mt-1">Quản lý và phân công các lớp test (không tính giờ dạy)</p>
         </div>
         <div className="flex items-center gap-3">
           <Button
             onClick={() => setShowModal(true)}
           >
             <Plus className="w-4 h-4 mr-2" />
-            Thêm lớp offset
-          </Button>
-
-          <Button
-            variant="success"
-            onClick={handleAutoAssignAll}
-            disabled={autoAssigning || !offsetClasses.some(oc => oc.status === 'pending' && !oc.assignedTeacherId)}
-            isLoading={autoAssigning}
-          >
-            <Zap className="w-4 h-4 mr-2" />
-            Tự động phân công tất cả
+            Thêm lớp test
           </Button>
         </div>
       </div>
@@ -438,13 +391,13 @@ const OffsetClasses = () => {
         <Card className="p-4 border-l-4 border-l-primary-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-secondary-500 uppercase tracking-wide font-semibold">Tổng lớp offset</p>
+              <p className="text-xs text-secondary-500 uppercase tracking-wide font-semibold">Tổng lớp test</p>
               <p className="text-2xl font-bold text-secondary-900 mt-1">
-                {offsetClasses.filter(oc => oc.status !== 'cancelled').length}
+                {testClasses.filter(sc => sc.status !== 'cancelled').length}
               </p>
             </div>
             <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center">
-              <BookMarked className="w-5 h-5 text-primary-600" />
+              <Layers className="w-5 h-5 text-primary-600" />
             </div>
           </div>
         </Card>
@@ -454,9 +407,7 @@ const OffsetClasses = () => {
             <div>
               <p className="text-xs text-secondary-500 uppercase tracking-wide font-semibold">Chưa có giáo viên</p>
               <p className="text-2xl font-bold text-danger-600 mt-1">
-              <p className="text-2xl font-bold text-danger-600 mt-1">
-                {offsetClasses.filter(oc => !oc.assignedTeacherId && oc.status !== 'cancelled').length}
-              </p>
+                {testClasses.filter(sc => !sc.assignedTeacherId && sc.status !== 'cancelled').length}
               </p>
             </div>
             <div className="w-10 h-10 bg-danger-50 rounded-lg flex items-center justify-center">
@@ -465,26 +416,14 @@ const OffsetClasses = () => {
           </div>
         </Card>
 
-        <Card className="p-4 border-l-4 border-l-success-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-secondary-500 uppercase tracking-wide font-semibold">Đã phân công</p>
-              <p className="text-2xl font-bold text-success-600 mt-1">
-                {offsetClasses.filter(oc => oc.status === 'assigned').length}
-              </p>
-            </div>
-            <div className="w-10 h-10 bg-success-50 rounded-lg flex items-center justify-center">
-              <Check className="w-5 h-5 text-success-600" />
-            </div>
-          </div>
-        </Card>
+    
 
         <Card className="p-4 border-l-4 border-l-purple-500">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-secondary-500 uppercase tracking-wide font-semibold">Hoàn thành</p>
               <p className="text-2xl font-bold text-purple-600 mt-1">
-                {offsetClasses.filter(oc => oc.status === 'completed').length}
+                {testClasses.filter(sc => sc.status === 'completed').length}
               </p>
             </div>
             <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
@@ -494,59 +433,6 @@ const OffsetClasses = () => {
         </Card>
       </div>
       
-      {/* Quick Actions */}
-      <Card className="p-4 bg-secondary-50 border-secondary-200">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm font-semibold text-secondary-700 mr-2">Tạo nhanh:</span>
-          
-          <button
-            onClick={() => {
-              const today = new Date();
-              const tomorrow = new Date(today);
-              tomorrow.setDate(today.getDate() + 1);
-              setFormData({
-                ...formData,
-                scheduledDate: tomorrow.toISOString().split('T')[0],
-                startTime: '19:30',
-                endTime: '21:00'
-              });
-              setShowModal(true);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-white border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors shadow-sm"
-          >
-            ⚡ Lớp tối mai 19h30
-          </button>
-          
-          <button
-            onClick={() => {
-              const today = new Date();
-              const nextWeek = new Date(today);
-              nextWeek.setDate(today.getDate() + 7);
-              setFormData({
-                ...formData,
-                scheduledDate: nextWeek.toISOString().split('T')[0],
-                startTime: '13:30',
-                endTime: '15:00'
-              });
-              setShowModal(true);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-white border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors shadow-sm"
-          >
-            📅 Tuần sau chiều
-          </button>
-          
-          <div className="h-6 w-px bg-secondary-300 mx-2"></div>
-          
-          <button
-            onClick={() => loadData()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-secondary-700 bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors shadow-sm"
-          >
-            <RefreshCw className="w-3 h-3" />
-            Làm mới
-          </button>
-        </div>
-      </Card>
-
       {/* Filters & Table */}
       <Card noPadding className="overflow-hidden">
         {/* Filters */}
@@ -555,7 +441,6 @@ const OffsetClasses = () => {
             {[
               { key: 'all', label: 'Tất cả' },
               { key: 'pending', label: 'Chờ xử lý' },
-              { key: 'assigned', label: 'Đã phân công' },
               { key: 'completed', label: 'Hoàn thành' },
               { key: 'cancelled', label: 'Đã hủy' }
             ].map((status) => (
@@ -571,8 +456,10 @@ const OffsetClasses = () => {
                 {status.label}
                 {filterStatus === status.key && (
                   <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
-                    {status.key === 'all' ? offsetClasses.length : 
-                     offsetClasses.filter(oc => oc.status === status.key).length}
+                    {status.key === 'all' ? testClasses.length : 
+                     status.key === 'pending' 
+                       ? testClasses.filter(sc => sc.status === 'pending' || sc.status === 'assigned').length 
+                       : testClasses.filter(sc => sc.status === status.key).length}
                   </span>
                 )}
               </button>
@@ -680,38 +567,36 @@ const OffsetClasses = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-secondary-200">
-            {offsetClasses.map((offsetClass) => (
-              <tr key={offsetClass._id} className="hover:bg-secondary-50 transition-colors">
+            {testClasses.map((suppClass) => (
+              <tr key={suppClass._id} className="hover:bg-secondary-50 transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0">
                       <div className="w-10 h-10 bg-secondary-100 rounded-lg flex items-center justify-center">
                         <span className="text-sm font-bold text-secondary-700">
-                          {offsetClass.subjectLevelId?.subjectId?.code || '?'}
+                          {suppClass.subjectId?.code || '?'}
                         </span>
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-semibold text-secondary-900">
-                          {offsetClass.subjectLevelId?.subjectId?.name || 'Chưa có môn học'}
+                          {suppClass.subjectId?.name || 'Chưa có môn học'}
                         </span>
-                        <span className="px-1.5 py-0.5 bg-secondary-100 text-secondary-600 text-[10px] font-bold uppercase tracking-wider rounded">
-                          HP{offsetClass.subjectLevelId?.semester || '?'}
-                        </span>
+
                       </div>
                       <div className="text-sm text-secondary-600 mb-1 font-mono">
-                        {offsetClass.className}
+                        {suppClass.className}
                       </div>
-                      {offsetClass.reason && (
+                      {suppClass.reason && (
                         <div className="text-xs text-secondary-500 mt-1 line-clamp-1 italic">
-                          "{offsetClass.reason}"
+                          "{suppClass.reason}"
                         </div>
                       )}
-                      {offsetClass.meetingLink && (
+                      {suppClass.meetingLink && (
                         <div className="mt-1">
                           <a 
-                            href={offsetClass.meetingLink} 
+                            href={suppClass.meetingLink} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium hover:underline"
@@ -727,28 +612,28 @@ const OffsetClasses = () => {
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center text-sm font-medium text-secondary-900">
                       <Calendar className="w-4 h-4 mr-2 text-secondary-400" />
-                      {format(new Date(offsetClass.scheduledDate), 'dd/MM/yyyy')}
+                      {format(new Date(suppClass.scheduledDate), 'dd/MM/yyyy')}
                     </div>
                     <div className="flex items-center text-sm text-secondary-600">
                       <Clock className="w-4 h-4 mr-2 text-secondary-400" />
-                      {offsetClass.startTime} - {offsetClass.endTime}
+                      {suppClass.startTime} - {suppClass.endTime}
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  {offsetClass.assignedTeacherId ? (
+                  {suppClass.assignedTeacherId ? (
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0 border border-white shadow-sm">
                         <span className="text-primary-700 text-xs font-bold">
-                          {offsetClass.assignedTeacherId.name?.charAt(0)}
+                          {suppClass.assignedTeacherId.name?.charAt(0)}
                         </span>
                       </div>
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-secondary-900 truncate">
-                          {offsetClass.assignedTeacherId.name}
+                          {suppClass.assignedTeacherId.name}
                         </div>
                         <div className="text-xs text-secondary-500 truncate">
-                          {offsetClass.assignedTeacherId.email}
+                          {suppClass.assignedTeacherId.email}
                         </div>
                       </div>
                     </div>
@@ -761,22 +646,22 @@ const OffsetClasses = () => {
                 </td>
                 <td className="px-6 py-4">
                   <div className="text-sm text-secondary-600 max-w-xs">
-                    {offsetClass.notes ? (
-                      <p className="line-clamp-2">{offsetClass.notes}</p>
+                    {suppClass.notes ? (
+                      <p className="line-clamp-2">{suppClass.notes}</p>
                     ) : (
                       <span className="text-secondary-400 italic text-xs">Không có ghi chú</span>
                     )}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {getStatusBadge(offsetClass.status)}
+                  {getStatusBadge(suppClass.status)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <div className="flex items-center justify-end gap-1">
                     {/* Edit */}
-                    {(offsetClass.status === 'pending' || offsetClass.status === 'assigned' || offsetClass.status === 'completed') && (
+                    {(suppClass.status === 'pending' || suppClass.status === 'assigned') && (
                       <button
-                        onClick={() => handleEdit(offsetClass)}
+                        onClick={() => handleEdit(suppClass)}
                         className="p-1.5 text-secondary-500 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
                         title="Chỉnh sửa"
                       >
@@ -785,9 +670,9 @@ const OffsetClasses = () => {
                     )}
                     
                     {/* Auto-assign */}
-                    {offsetClass.status === 'pending' && !offsetClass.assignedTeacherId && (
+                    {suppClass.status === 'pending' && !suppClass.assignedTeacherId && (
                       <button
-                        onClick={() => handleAutoAssign(offsetClass._id)}
+                        onClick={() => handleAutoAssign(suppClass._id)}
                         className="p-1.5 text-secondary-500 hover:text-success-600 hover:bg-success-50 rounded transition-colors"
                         title="Tự động phân công"
                       >
@@ -796,17 +681,17 @@ const OffsetClasses = () => {
                     )}
                     
                     {/* Reallocate & Complete */}
-                    {offsetClass.status === 'assigned' && (
+                    {(suppClass.status === 'assigned' || (suppClass.status === 'pending' && suppClass.assignedTeacherId)) && (
                       <>
                         <button
-                          onClick={() => handleReallocate(offsetClass._id)}
+                          onClick={() => handleReallocate(suppClass._id)}
                           className="p-1.5 text-secondary-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                           title="Tái phân bổ"
                         >
                           <RefreshCw className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleMarkCompleted(offsetClass._id)}
+                          onClick={() => handleMarkCompleted(suppClass._id)}
                           className="p-1.5 text-secondary-500 hover:text-success-600 hover:bg-success-50 rounded transition-colors"
                           title="Hoàn thành"
                         >
@@ -816,9 +701,9 @@ const OffsetClasses = () => {
                     )}
                     
                     {/* Cancel */}
-                    {(offsetClass.status === 'pending' || offsetClass.status === 'assigned') && (
+                    {(suppClass.status === 'pending' || suppClass.status === 'assigned') && (
                       <button
-                        onClick={() => handleCancel(offsetClass._id)}
+                        onClick={() => handleCancel(suppClass._id)}
                         className="p-1.5 text-secondary-500 hover:text-warning-600 hover:bg-warning-50 rounded transition-colors"
                         title="Hủy lớp"
                       >
@@ -827,9 +712,9 @@ const OffsetClasses = () => {
                     )}
                     
                     {/* Delete */}
-                    {(offsetClass.status === 'cancelled' || offsetClass.status === 'completed') && (
+                    {(suppClass.status === 'cancelled' || suppClass.status === 'completed') && (
                       <button
-                        onClick={() => handleDelete(offsetClass._id)}
+                        onClick={() => handleDelete(suppClass._id)}
                         className="p-1.5 text-secondary-500 hover:text-danger-600 hover:bg-danger-50 rounded transition-colors"
                         title="Xóa"
                       >
@@ -843,12 +728,12 @@ const OffsetClasses = () => {
             </tbody>
           </table>
 
-          {offsetClasses.length === 0 && (
+          {testClasses.length === 0 && (
             <div className="text-center py-12 bg-white">
               <div className="w-16 h-16 bg-secondary-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <BookMarked className="w-8 h-8 text-secondary-400" />
               </div>
-              <h3 className="text-lg font-medium text-secondary-900">Chưa có lớp offset nào</h3>
+              <h3 className="text-lg font-medium text-secondary-900">Chưa có lớp test nào</h3>
               <p className="text-secondary-500 mt-1">Tạo lớp mới hoặc thay đổi bộ lọc để xem thêm.</p>
             </div>
           )}
@@ -869,7 +754,7 @@ const OffsetClasses = () => {
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-bold text-secondary-900">
-                    {editingId ? 'Chỉnh sửa lớp offset' : 'Tạo lớp offset mới'}
+                    {editingId ? 'Chỉnh sửa lớp test' : 'Tạo lớp test mới'}
                   </h3>
                   <button
                     onClick={handleCloseModal}
@@ -891,7 +776,7 @@ const OffsetClasses = () => {
                       value={formData.className}
                       onChange={(e) => setFormData({ ...formData, className: e.target.value })}
                       className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-                      placeholder="VD: TE-C-PA-711-2020BLG-0094"
+                      placeholder="VD: SUP-CLASS-001"
                     />
                   </div>
 
@@ -903,11 +788,8 @@ const OffsetClasses = () => {
                       </label>
                       <select
                         required
-                        value={activeSubjectId}
-                        onChange={(e) => {
-                          setActiveSubjectId(e.target.value);
-                          setFormData({ ...formData, subjectLevelId: '' });
-                        }}
+                        value={formData.subjectId}
+                        onChange={(e) => setFormData({ ...formData, subjectId: e.target.value })}
                         className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
                       >
                         <option value="">Chọn môn học</option>
@@ -919,27 +801,7 @@ const OffsetClasses = () => {
                       </select>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-secondary-700 mb-1">
-                        Học phần <span className="text-danger-500">*</span>
-                      </label>
-                      <select
-                        required
-                        value={formData.subjectLevelId}
-                        onChange={(e) => setFormData({ ...formData, subjectLevelId: e.target.value })}
-                        disabled={!activeSubjectId}
-                        className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all disabled:bg-gray-100 disabled:text-gray-400"
-                      >
-                        <option value="">-- Chọn học phần --</option>
-                        {subjectLevels
-                          .filter(l => l.subjectId?._id === activeSubjectId)
-                          .map((level) => (
-                            <option key={level._id} value={level._id}>
-                              {level.subjectId?.name} - HP {level.semester}
-                            </option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* Removed Subject Level Select */}
 
                     <div>
                       <label className="block text-sm font-medium text-secondary-700 mb-1">
@@ -961,95 +823,24 @@ const OffsetClasses = () => {
                       Thời gian học
                     </label>
                     
-                    {/* Quick Time Presets */}
-                    <div className="space-y-3 mb-6">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-yellow-100 rounded-lg">
-                          <Clock className="w-4 h-4 text-yellow-600" />
-                        </div>
-                        <span className="font-semibold text-gray-700">Gợi ý khung giờ nhanh</span>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {/* Buổi sáng */}
-                        <div className="p-3 rounded-xl border border-blue-100 bg-blue-50/50 flex flex-col gap-2 transition-all hover:shadow-sm">
-                          <div className="flex items-center gap-1.5 text-sm font-medium text-blue-800">
-                            <span>🌅</span>
-                            <span>Buổi sáng</span>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            {[
-                              { start: '08:00', end: '09:30' },
-                              { start: '09:30', end: '11:00' }
-                            ].map((slot, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setFormData({ ...formData, startTime: slot.start, endTime: slot.end })}
-                                className="px-2.5 py-2 text-xs font-medium rounded-lg bg-white border border-blue-200 text-blue-600 hover:text-blue-700 hover:border-blue-400 hover:bg-blue-50 transition-all w-full text-center"
-                              >
-                                {slot.start} - {slot.end}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Buổi chiều */}
-                        <div className="p-3 rounded-xl border border-orange-100 bg-orange-50/50 flex flex-col gap-2 transition-all hover:shadow-sm">
-                          <div className="flex items-center gap-1.5 text-sm font-medium text-orange-800">
-                            <span>☀️</span>
-                            <span>Buổi chiều</span>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            {[
-                              { start: '13:30', end: '15:00' },
-                              { start: '15:00', end: '16:30' },
-                              { start: '16:30', end: '18:00' }
-                            ].map((slot, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setFormData({ ...formData, startTime: slot.start, endTime: slot.end })}
-                                className="px-2.5 py-2 text-xs font-medium rounded-lg bg-white border border-orange-200 text-orange-600 hover:text-orange-700 hover:border-orange-400 hover:bg-orange-50 transition-all w-full text-center"
-                              >
-                                {slot.start} - {slot.end}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Buổi tối */}
-                        <div className="p-3 rounded-xl border border-purple-100 bg-purple-50/50 flex flex-col gap-2 transition-all hover:shadow-sm">
-                          <div className="flex items-center gap-1.5 text-sm font-medium text-purple-800">
-                            <span>🌙</span>
-                            <span>Buổi tối</span>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            {[
-                              { start: '18:00', end: '19:30' },
-                              { start: '19:30', end: '21:00' }
-                            ].map((slot, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setFormData({ ...formData, startTime: slot.start, endTime: slot.end })}
-                                className="px-2.5 py-2 text-xs font-medium rounded-lg bg-white border border-purple-200 text-purple-600 hover:text-purple-700 hover:border-purple-400 hover:bg-purple-50 transition-all w-full text-center"
-                              >
-                                {slot.start} - {slot.end}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <input
                           type="time"
                           required
                           value={formData.startTime}
-                          onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                          onChange={(e) => {
+                            const newStartTime = e.target.value;
+                            // Auto calculate end time (+60 mins)
+                            let newEndTime = formData.endTime;
+                             if (newStartTime) {
+                              const [hours, mins] = newStartTime.split(':').map(Number);
+                              const date = new Date();
+                              date.setHours(hours, mins + 60);
+                              newEndTime = date.toTimeString().slice(0, 5);
+                            }
+                            setFormData({ ...formData, startTime: newStartTime, endTime: newEndTime });
+                          }}
                           className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
                         />
                       </div>
@@ -1127,7 +918,7 @@ const OffsetClasses = () => {
                           value={formData.reason}
                           onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                           className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-                          placeholder="VD: Giáo viên nghỉ ốm"
+                          placeholder="VD: Lớp kiểm tra cuói kỳ..."
                         />
                       </div>
 
@@ -1173,4 +964,4 @@ const OffsetClasses = () => {
   );
 };
 
-export default OffsetClasses;
+export default TestClasses;

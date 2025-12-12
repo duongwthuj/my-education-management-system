@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Calendar, Users, Clock, Edit, Trash2, AlertCircle, Info } from 'lucide-react';
+import { X, Calendar, Users, Clock, Edit, Trash2, AlertCircle, Info, ClipboardCheck } from 'lucide-react';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 
@@ -314,13 +314,15 @@ export const QuickCreateModal = ({
   onClose, 
   data, 
   onOpenOffsetForm, 
-  onOpenFixedForm 
+  onOpenFixedForm,
+  onOpenSupplementaryForm,
+  onOpenTestForm
 }) => {
   if (!show || !data) return null;
 
   return (
     <div className="fixed inset-0 bg-secondary-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl animate-scale-up">
+      <Card className="w-full max-w-4xl animate-scale-up">
         <div className="px-6 py-4 border-b border-secondary-200 flex items-center justify-between bg-secondary-50">
           <h3 className="text-lg font-bold text-secondary-900">➕ Tạo mới lịch dạy</h3>
           <button onClick={onClose} className="text-secondary-400 hover:text-secondary-600 p-1 hover:bg-secondary-200 rounded transition-colors">
@@ -388,6 +390,43 @@ export const QuickCreateModal = ({
                 </div>
               </div>
             </button>
+            <button
+              onClick={onOpenSupplementaryForm}
+              className="p-6 border-2 border-green-200 rounded-xl hover:bg-green-50 hover:border-green-300 transition-all text-left group"
+            >
+              <div className="flex items-start gap-3">
+                <div className="p-3 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                  <span className="text-2xl">🌱</span>
+                </div>
+                <div>
+                  <h4 className="font-bold text-secondary-900 mb-1 group-hover:text-green-700">
+                    Tạo lớp bổ trợ
+                  </h4>
+                  <p className="text-sm text-secondary-600">
+                    Lớp học thêm, ngoại khóa
+                  </p>
+                </div>
+              </div>
+            </button>
+            
+            <button
+              onClick={onOpenTestForm}
+              className="p-6 border-2 border-orange-200 rounded-xl hover:bg-orange-50 hover:border-orange-300 transition-all text-left group"
+            >
+              <div className="flex items-start gap-3">
+                <div className="p-3 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition-colors">
+                  <ClipboardCheck className="w-8 h-8 text-orange-600" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-secondary-900 mb-1 group-hover:text-orange-700">
+                    Tạo lớp Test
+                  </h4>
+                  <p className="text-sm text-secondary-600">
+                    Lớp kiểm tra đánh giá
+                  </p>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
       </Card>
@@ -406,6 +445,31 @@ export const OffsetClassModal = ({
 }) => {
   if (!show || !quickCreateData) return null;
 
+  // Derive unique subjects from subjectLevels
+  const subjects = React.useMemo(() => {
+    const uniqueSubjects = {};
+    subjectLevels.forEach(level => {
+      if (level.subjectId && level.subjectId._id) {
+        uniqueSubjects[level.subjectId._id] = level.subjectId;
+      }
+    });
+    return Object.values(uniqueSubjects);
+  }, [subjectLevels]);
+
+  const [activeSubjectId, setActiveSubjectId] = React.useState('');
+
+  // Sync activeSubjectId when formData.subjectLevelId changes (e.g. opening modal with data)
+  React.useEffect(() => {
+    if (formData.subjectLevelId && subjectLevels.length > 0) {
+      const selectedLevel = subjectLevels.find(l => l._id === formData.subjectLevelId);
+      if (selectedLevel?.subjectId?._id) {
+        setActiveSubjectId(selectedLevel.subjectId._id);
+      }
+    } else if (!formData.subjectLevelId) {
+      setActiveSubjectId('');
+    }
+  }, [formData.subjectLevelId, subjectLevels]);
+
   return (
     <div className="fixed inset-0 bg-secondary-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-up">
@@ -420,19 +484,44 @@ export const OffsetClassModal = ({
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-1">
-                Môn học & Học phần <span className="text-danger-500">*</span>
+                Môn học <span className="text-danger-500">*</span>
+              </label>
+              <select
+                required
+                value={activeSubjectId}
+                onChange={(e) => {
+                  setActiveSubjectId(e.target.value);
+                  setFormData({ ...formData, subjectLevelId: '' });
+                }}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+              >
+                <option value="">-- Chọn môn học --</option>
+                {subjects.map(subject => (
+                  <option key={subject._id} value={subject._id}>
+                    {subject.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                 Học phần <span className="text-danger-500">*</span>
               </label>
               <select
                 required
                 value={formData.subjectLevelId}
                 onChange={(e) => setFormData({ ...formData, subjectLevelId: e.target.value })}
-                className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+                disabled={!activeSubjectId}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all disabled:bg-gray-100 disabled:text-gray-400"
               >
-                <option value="">-- Chọn môn học & học phần --</option>
-                {subjectLevels.map(level => (
-                  <option key={level._id} value={level._id}>
-                    {level.displayName || `${level.subjectId?.name} - Level ${level.level}`}
-                  </option>
+                <option value="">-- Chọn học phần --</option>
+                {subjectLevels
+                  .filter(l => l.subjectId?._id === activeSubjectId)
+                  .map(level => (
+                    <option key={level._id} value={level._id}>
+                      {level.displayName || `${level.subjectId?.name} - HP ${level.semester}`}
+                    </option>
                 ))}
               </select>
             </div>
@@ -736,6 +825,492 @@ export const FixedScheduleModal = ({
                 className="flex-1"
               >
                 Thêm lịch cố định
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+export const SupplementaryClassModal = ({ 
+  show, 
+  onClose, 
+  formData, 
+  setFormData, 
+  subjectLevels,
+  handleSubmit, 
+  quickCreateData 
+}) => {
+  if (!show || !quickCreateData) return null;
+
+  // Derive unique subjects from subjectLevels
+  const subjects = React.useMemo(() => {
+    const uniqueSubjects = {};
+    subjectLevels.forEach(level => {
+      if (level.subjectId && level.subjectId._id) {
+        uniqueSubjects[level.subjectId._id] = level.subjectId;
+      }
+    });
+    return Object.values(uniqueSubjects);
+  }, [subjectLevels]);
+
+  const [activeSubjectId, setActiveSubjectId] = React.useState('');
+
+  // Sync activeSubjectId when formData.subjectLevelId changes
+  React.useEffect(() => {
+    if (formData.subjectLevelId && subjectLevels.length > 0) {
+      const selectedLevel = subjectLevels.find(l => l._id === formData.subjectLevelId);
+      if (selectedLevel?.subjectId?._id) {
+        setActiveSubjectId(selectedLevel.subjectId._id);
+      }
+    } else if (!formData.subjectLevelId) {
+      setActiveSubjectId('');
+    }
+  }, [formData.subjectLevelId, subjectLevels]);
+
+  return (
+    <div className="fixed inset-0 bg-secondary-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-up">
+        <div className="px-6 py-4 border-b border-green-100 flex items-center justify-between bg-green-50">
+          <h3 className="text-lg font-bold text-green-900">🌱 Tạo lớp bổ trợ</h3>
+          <button onClick={onClose} className="text-green-400 hover:text-green-600 p-1 hover:bg-green-100 rounded transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <div className="p-6">
+          {/* Show selected teacher info */}
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-green-200 flex items-center justify-center text-green-800 text-sm font-bold">
+                {quickCreateData.teacherName?.charAt(0) || '?'}
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-green-900">
+                  Giáo viên: {quickCreateData.teacherName || 'Chưa xác định'}
+                </div>
+                <div className="text-xs text-green-600">
+                  Ngày: {quickCreateData.date ? new Date(quickCreateData.date).toLocaleDateString('vi-VN') : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Môn học <span className="text-danger-500">*</span>
+              </label>
+              <select
+                required
+                value={activeSubjectId}
+                onChange={(e) => {
+                  setActiveSubjectId(e.target.value);
+                  setFormData({ ...formData, subjectLevelId: '' });
+                }}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+              >
+                <option value="">-- Chọn môn học --</option>
+                {subjects.map(subject => (
+                  <option key={subject._id} value={subject._id}>
+                    {subject.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Học phần <span className="text-danger-500">*</span>
+              </label>
+              <select
+                required
+                value={formData.subjectLevelId}
+                onChange={(e) => setFormData({ ...formData, subjectLevelId: e.target.value })}
+                disabled={!activeSubjectId}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all disabled:bg-gray-100 disabled:text-gray-400"
+              >
+                <option value="">-- Chọn học phần --</option>
+                {subjectLevels
+                  .filter(l => l.subjectId?._id === activeSubjectId)
+                  .map(level => (
+                    <option key={level._id} value={level._id}>
+                      {level.displayName || `${level.subjectId?.name} - HP ${level.semester}`}
+                    </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Tên lớp <span className="text-danger-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Ví dụ: Lớp bổ trợ Toán..."
+                value={formData.className}
+                onChange={(e) => setFormData({ ...formData, className: e.target.value })}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+              />
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-yellow-100 rounded-lg">
+                  <Clock className="w-4 h-4 text-yellow-600" />
+                </div>
+                <span className="font-semibold text-gray-700">Gợi ý khung giờ nhanh</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Buổi sáng */}
+                <div className="p-3 rounded-xl border border-blue-100 bg-blue-50/50 flex flex-col gap-2 transition-all hover:shadow-sm">
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-blue-800">
+                    <span>🌅</span>
+                    <span>Buổi sáng</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {[
+                      { start: '08:00', end: '08:45' },
+                      { start: '08:45', end: '09:30' },
+                      { start: '09:30', end: '10:15' },
+                      { start: '10:15', end: '11:00' }
+                    ].map((slot, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                           const [hours, mins] = slot.start.split(':').map(Number);
+                           const date = new Date();
+                           date.setHours(hours, mins + 45);
+                           const endTime = date.toTimeString().slice(0, 5);
+                           setFormData({ ...formData, startTime: slot.start, endTime: endTime })
+                        }}
+                        className="px-2.5 py-2 text-xs font-medium rounded-lg bg-white border border-blue-200 text-blue-600 hover:text-blue-700 hover:border-blue-400 hover:bg-blue-50 transition-all w-full text-center"
+                      >
+                        {slot.start} (45')
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Buổi chiều */}
+                <div className="p-3 rounded-xl border border-orange-100 bg-orange-50/50 flex flex-col gap-2 transition-all hover:shadow-sm">
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-orange-800">
+                    <span>☀️</span>
+                    <span>Buổi chiều</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {[
+                      { start: '13:30', end: '14:15' },
+                      { start: '14:15', end: '15:00' },
+                      { start: '15:00', end: '15:45' },
+                      { start: '15:45', end: '16:30' },
+                      { start: '16:30', end: '17:15' },
+                      { start: '17:15', end: '18:00' }
+                    ].map((slot, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                           const [hours, mins] = slot.start.split(':').map(Number);
+                           const date = new Date();
+                           date.setHours(hours, mins + 45);
+                           const endTime = date.toTimeString().slice(0, 5);
+                           setFormData({ ...formData, startTime: slot.start, endTime: endTime })
+                        }}
+                        className="px-2.5 py-2 text-xs font-medium rounded-lg bg-white border border-orange-200 text-orange-600 hover:text-orange-700 hover:border-orange-400 hover:bg-orange-50 transition-all w-full text-center"
+                      >
+                         {slot.start} (45')
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Buổi tối */}
+                <div className="p-3 rounded-xl border border-purple-100 bg-purple-50/50 flex flex-col gap-2 transition-all hover:shadow-sm">
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-purple-800">
+                    <span>🌙</span>
+                    <span>Buổi tối</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {[
+                      { start: '18:00', end: '18:45' },
+                      { start: '18:45', end: '19:30' },
+                      { start: '19:30', end: '20:15' },
+                      { start: '20:15', end: '21:00' }
+                    ].map((slot, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                           const [hours, mins] = slot.start.split(':').map(Number);
+                           const date = new Date();
+                           date.setHours(hours, mins + 45);
+                           const endTime = date.toTimeString().slice(0, 5);
+                           setFormData({ ...formData, startTime: slot.start, endTime: endTime })
+                        }}
+                        className="px-2.5 py-2 text-xs font-medium rounded-lg bg-white border border-purple-200 text-purple-600 hover:text-purple-700 hover:border-purple-400 hover:bg-purple-50 transition-all w-full text-center"
+                      >
+                         {slot.start} (45')
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-1">
+                  Giờ bắt đầu <span className="text-danger-500">*</span>
+                </label>
+                <input
+                  type="time"
+                  required
+                  value={formData.startTime}
+                  onChange={(e) => {
+                    const newStartTime = e.target.value;
+                    let newEndTime = formData.endTime;
+                    if (newStartTime) {
+                      const [hours, mins] = newStartTime.split(':').map(Number);
+                      const date = new Date();
+                      date.setHours(hours, mins + 45);
+                      newEndTime = date.toTimeString().slice(0, 5);
+                    }
+                    setFormData({ ...formData, startTime: newStartTime, endTime: newEndTime });
+                  }}
+                  className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-1">
+                  Giờ kết thúc <span className="text-danger-500">*</span>
+                </label>
+                <input
+                  type="time"
+                  required
+                  value={formData.endTime}
+                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                  className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Link meeting
+              </label>
+              <input
+                type="url"
+                placeholder="https://meet.google.com/..."
+                value={formData.meetingLink}
+                onChange={(e) => setFormData({ ...formData, meetingLink: e.target.value })}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Ghi chú
+              </label>
+              <textarea
+                rows={3}
+                placeholder="Nội dung cần lưu ý..."
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all resize-none"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-secondary-100">
+              <Button variant="secondary" onClick={onClose} className="flex-1">
+                Hủy
+              </Button>
+              <Button 
+                type="submit" 
+                className="flex-1 bg-green-600 hover:bg-green-700 border-transparent text-white"
+              >
+                Tạo lớp bổ trợ
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+export const TestClassModal = ({ 
+  show, 
+  onClose, 
+  formData, 
+  setFormData, 
+  subjects, // Changed from subjectLevels to subjects
+  teachers,
+  handleSubmit, 
+  quickCreateData 
+}) => {
+  if (!show || !quickCreateData) return null;
+
+  // Initialize with quickCreateData if empty
+  React.useEffect(() => {
+    if (show && quickCreateData) {
+      // Logic to auto-fill teacher if quickCreateData has teacherId
+      if (quickCreateData.teacherId && !formData.assignedTeacherId) { // If teacher provided and not yet set
+         setFormData(prev => ({ ...prev, assignedTeacherId: quickCreateData.teacherId }));
+      }
+      // Auto-fill date
+      if (quickCreateData.date && !formData.scheduledDate) {
+        setFormData(prev => ({ ...prev, scheduledDate: quickCreateData.date }));
+      }
+    }
+  }, [show, quickCreateData]);
+
+  return (
+    <div className="fixed inset-0 bg-secondary-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-scale-up">
+        <div className="px-6 py-4 border-b border-secondary-200 flex items-center justify-between bg-orange-50">
+          <h3 className="text-lg font-bold text-orange-900 flex items-center gap-2">
+            <ClipboardCheck className="w-5 h-5" />
+            Tạo lớp Test
+          </h3>
+          <button onClick={onClose} className="text-secondary-400 hover:text-secondary-600 p-1 hover:bg-secondary-200 rounded transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <div className="p-6 overflow-y-auto">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Tên lớp <span className="text-danger-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.className}
+                onChange={(e) => setFormData({ ...formData, className: e.target.value })}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                placeholder="VD: TEST-CLASS-001"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-1">
+                  Môn học <span className="text-danger-500">*</span>
+                </label>
+                <select
+                  required
+                  value={formData.subjectId}
+                  onChange={(e) => setFormData({ ...formData, subjectId: e.target.value })}
+                  className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                >
+                  <option value="">Chọn môn học</option>
+                  {subjects.map((subject) => (
+                    <option key={subject._id} value={subject._id}>
+                      {subject.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-1">
+                  Ngày học <span className="text-danger-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={formData.scheduledDate}
+                  onChange={(e) => setFormData({ ...formData, scheduledDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="bg-secondary-50 p-4 rounded-lg border border-secondary-200">
+              <label className="block text-sm font-medium text-secondary-700 mb-3">
+                Thời gian học
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-secondary-500 mb-1 block">Bắt đầu</label>
+                  <input
+                    type="time"
+                    required
+                    value={formData.startTime}
+                    onChange={(e) => {
+                       const newStartTime = e.target.value;
+                       let newEndTime = formData.endTime;
+                       if (newStartTime) {
+                         const [hours, mins] = newStartTime.split(':').map(Number);
+                         const date = new Date();
+                         date.setHours(hours, mins + 60); // 1 hour duration
+                         newEndTime = date.toTimeString().slice(0, 5);
+                       }
+                       setFormData({ ...formData, startTime: newStartTime, endTime: newEndTime });
+                    }}
+                    className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-secondary-500 mb-1 block">Kết thúc</label>
+                  <input
+                    type="time"
+                    required
+                    value={formData.endTime}
+                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                    className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-1">
+                Phân công giáo viên
+              </label>
+               <select
+                value={formData.assignedTeacherId || ''}
+                onChange={(e) => setFormData({ ...formData, assignedTeacherId: e.target.value })}
+                className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+              >
+                <option value="">🤖 Tự động phân công</option>
+                {teachers.map((teacher) => (
+                  <option key={teacher._id} value={teacher._id}>
+                    👨‍🏫 {teacher.name}
+                  </option>
+                ))}
+              </select>
+               <p className="text-xs text-secondary-500 mt-1">
+                Tuỳ chọn: Để trống để hệ thống tự động tìm giáo viên phù hợp.
+              </p>
+            </div>
+            
+             <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-1">
+                  Link meeting
+                </label>
+                <input
+                  type="url"
+                  value={formData.meetingLink}
+                  onChange={(e) => setFormData({ ...formData, meetingLink: e.target.value })}
+                  className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                  placeholder="https://..."
+                />
+             </div>
+
+            <div className="flex gap-3 pt-4 border-t border-secondary-100">
+              <Button type="button" variant="secondary" onClick={onClose} className="flex-1">
+                Hủy
+              </Button>
+              <Button type="submit" className="flex-1 bg-orange-600 hover:bg-orange-700 border-transparent text-white">
+                Tạo lớp Test
               </Button>
             </div>
           </form>

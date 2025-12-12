@@ -245,7 +245,7 @@ export const getAllSubjectLevels = async (req, res) => {
     try {
         const subjectLevels = await SubjectLevel.find({})
             .populate('subjectId', 'name code')
-            .sort({ 'subjectId.name': 1, level: 1 });
+            .sort({ 'subjectId.name': 1, semester: 1 });
 
         res.status(200).json({
             success: true,

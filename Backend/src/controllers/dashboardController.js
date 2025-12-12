@@ -1,6 +1,8 @@
 import Teacher from '../models/teacher.js';
 import OffsetClass from '../models/offsetClass.js';
 import FixedSchedule from '../models/fixedScheduled.js';
+import SupplementaryClass from '../models/supplementaryClass.js';
+import TestClass from '../models/testClass.js';
 
 // Helper: Calculate hours between two times
 const calculateHours = (startTime, endTime) => {
@@ -117,6 +119,16 @@ export const getTeachingHoursStats = async (req, res) => {
         })
         .lean();
 
+      // Get supplementary classes (for counting count)
+      const supplementaryClasses = await SupplementaryClass.find({
+        assignedTeacherId: teacher._id,
+        scheduledDate: {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate)
+        },
+        status: 'completed' // Only count completed classes as "taught"
+      }).lean();
+
       // Calculate fixed schedule hours (recurring weekly)
       let fixedHours = 0;
       for (const schedule of fixedSchedules) {
@@ -188,7 +200,8 @@ export const getTeachingHoursStats = async (req, res) => {
         totalHours: Math.round(totalHours * 10) / 10,
         fixedClassCount: fixedSchedules.length,
         offsetClassCount: offsetClasses.length,
-        substituteClassCount: substituteLeaves.length
+        substituteClassCount: substituteLeaves.length,
+        supplementaryClassCount: supplementaryClasses.length
       });
     }
 
@@ -203,7 +216,8 @@ export const getTeachingHoursStats = async (req, res) => {
         totalFixedHours: Math.round(teacherStats.reduce((sum, t) => sum + t.fixedHours, 0) * 10) / 10,
         totalSubstituteHours: Math.round(teacherStats.reduce((sum, t) => sum + t.substituteHours, 0) * 10) / 10,
         totalOffsetHours: Math.round(teacherStats.reduce((sum, t) => sum + t.offsetHours, 0) * 10) / 10,
-        totalHours: Math.round(teacherStats.reduce((sum, t) => sum + t.totalHours, 0) * 10) / 10
+        totalHours: Math.round(teacherStats.reduce((sum, t) => sum + t.totalHours, 0) * 10) / 10,
+        totalSupplementaryClasses: teacherStats.reduce((sum, t) => sum + t.supplementaryClassCount, 0)
       }
     });
   } catch (error) {
@@ -348,6 +362,12 @@ export const getTeacherHoursDetail = async (req, res) => {
       };
     });
 
+    // Get supplementary classes with details
+    // We didn't import this for this function but let's assume we want details too or just leave it for stats overview.
+    // The user said "chỉ cần hiển thị đã dạy bao nhiêu ca bổ trợ là được" so maybe overview is enough.
+    // But since I'm fixing the file I can add it if needed. For now I keep it simple to match user request and avoid complexity.
+
+    // Calculate total hours
     const fixedHours = fixedScheduleDetails.reduce((sum, s) => sum + s.totalHours, 0);
     const offsetHours = offsetClassDetails.reduce((sum, s) => sum + s.hours, 0);
 
@@ -463,6 +483,72 @@ export const getOffsetClassStatistics = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching offset class statistics',
+      error: error.message
+    });
+  }
+};
+
+// Get test class statistics
+export const getTestClassStatistics = async (req, res) => {
+  try {
+    const { startDate, endDate, teacherId } = req.query;
+
+    // Build query filter
+    const filter = {};
+
+    if (startDate && endDate) {
+      filter.scheduledDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+
+    if (teacherId) {
+      filter.assignedTeacherId = teacherId;
+    }
+
+    // Get all test classes matching filter
+    const allTestClasses = await TestClass.find(filter).lean();
+
+    // Calculate statistics
+    const total = allTestClasses.length;
+    const pending = allTestClasses.filter(tc => tc.status === 'pending').length;
+    const assigned = allTestClasses.filter(tc => tc.status === 'assigned').length;
+    const completed = allTestClasses.filter(tc => tc.status === 'completed').length;
+    const cancelled = allTestClasses.filter(tc => tc.status === 'cancelled').length;
+
+    // Group by teacher
+    const byTeacher = {};
+    allTestClasses.forEach(tc => {
+      const teacherId = tc.assignedTeacherId?.toString() || 'unassigned';
+      if (!byTeacher[teacherId]) {
+        byTeacher[teacherId] = {
+          total: 0,
+          pending: 0,
+          assigned: 0,
+          completed: 0,
+          cancelled: 0
+        };
+      }
+      byTeacher[teacherId].total++;
+      byTeacher[teacherId][tc.status]++;
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        total,
+        pending,
+        assigned,
+        completed,
+        cancelled,
+        byTeacher
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching test class statistics',
       error: error.message
     });
   }

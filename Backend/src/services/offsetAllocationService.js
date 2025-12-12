@@ -34,13 +34,29 @@ class OffsetAllocationService {
         }
 
         // Bước 1: Lấy danh sách giáo viên có trình độ phù hợp
-        const teachersWithLevel = await TeacherLevel.find({
-            subjectLevelId,
-            isActive: true
-        }).populate({
-            path: 'teacherId',
-            match: { status: 'active' }
-        });
+        let teachersWithLevel = [];
+
+        if (subjectLevelId) {
+            teachersWithLevel = await TeacherLevel.find({
+                subjectLevelId,
+                isActive: true
+            }).populate({
+                path: 'teacherId',
+                match: { status: 'active' }
+            });
+        } else if (offsetClass.subjectId) {
+            // Find all subject levels for this subject to search for teachers qualified in ANY level of this subject
+            const SubjectLevel = (await import('../models/subjectLevel.js')).default;
+            const levels = await SubjectLevel.find({ subjectId: offsetClass.subjectId, isActive: true }).distinct('_id');
+
+            teachersWithLevel = await TeacherLevel.find({
+                subjectLevelId: { $in: levels },
+                isActive: true
+            }).populate({
+                path: 'teacherId',
+                match: { status: 'active' }
+            });
+        }
 
         console.log(`   👥 Found ${teachersWithLevel.length} teachers with required level`);
 

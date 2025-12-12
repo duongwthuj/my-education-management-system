@@ -13,6 +13,8 @@ import './models/offsetClass.js';
 import './models/fixedScheduled.js';
 import './models/fixedScheduleLeave.js';
 import './models/notification.js';
+import './models/supplementaryClass.js';
+import './models/testClass.js';
 
 // Import routes
 import healthRoutes from './routes/health.js';
@@ -24,6 +26,8 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import fixedScheduleLeaveRoutes from './routes/fixedScheduleLeaveRoutes.js';
 import googleSheetRoutes from './routes/googleSheetRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import supplementaryClassRoutes from './routes/supplementaryClassRoutes.js';
+import testClassRoutes from './routes/testClassRoutes.js';
 
 const app = express();
 
@@ -50,6 +54,8 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/fixed-schedule-leaves', fixedScheduleLeaveRoutes);
 app.use('/api/google-sheets', googleSheetRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/supplementary-classes', supplementaryClassRoutes);
+app.use('/api/test-classes', testClassRoutes);
 
 // 404 handler
 app.use(notFoundHandler);

@@ -20,7 +20,9 @@ import {
   Filter, 
   Clock, 
   CheckCircle, 
-  AlertCircle 
+  AlertCircle,
+  Layers,
+  ClipboardCheck // Import icon for Test Class
 } from 'lucide-react';
 import { dashboardAPI, teachersAPI } from '../services/api';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
@@ -76,6 +78,8 @@ const Dashboard = () => {
     pendingClasses: 0,
     assignedClasses: 0,
     completedClasses: 0,
+    totalSupplementaryClasses: 0,
+    totalTestClasses: 0,
   });
   const [teachers, setTeachers] = useState([]);
   const [selectedTeacher, setSelectedTeacher] = useState('all');
@@ -84,6 +88,8 @@ const Dashboard = () => {
     endDate: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
   });
   const [offsetData, setOffsetData] = useState([]);
+  const [supplementaryData, setSupplementaryData] = useState([]);
+  const [testClassData, setTestClassData] = useState([]);
   const [teacherHoursData, setTeacherHoursData] = useState([]);
 
   useEffect(() => {
@@ -118,6 +124,14 @@ const Dashboard = () => {
 
       const offsetStats = offsetStatsRes.data || {};
 
+      // Load test class statistics
+      const testClassStatsRes = await dashboardAPI.getTestClassStatistics({
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
+        teacherId: selectedTeacher !== 'all' ? selectedTeacher : undefined
+      });
+      const testClassStats = testClassStatsRes.data || {};
+
       // Update stats
       setStats({
         totalTeachers: summary.totalTeachers || 0,
@@ -125,17 +139,49 @@ const Dashboard = () => {
         pendingClasses: offsetStats.pending || 0,
         assignedClasses: offsetStats.assigned || 0,
         completedClasses: offsetStats.completed || 0,
+        completedClasses: offsetStats.completed || 0,
+        totalSupplementaryClasses: summary.totalSupplementaryClasses || 0,
+        totalTestClasses: testClassStats.total || 0,
       });
 
       // Prepare data for charts
-      const sortedStats = [...teacherStats].sort((a, b) => b.totalHours - a.totalHours).slice(0, 10);
+      const sortedStats = [...teacherStats].sort((a, b) => b.totalHours - a.totalHours).slice(0, 100);
+
+      // Helper to abbreviate name: "Trần Hoàng Long" -> "THLong"
+      const abbreviateName = (name) => {
+        if (!name) return '';
+        const parts = name.trim().split(/\s+/);
+        if (parts.length === 1) return parts[0];
+        
+        const initials = parts.slice(0, parts.length - 1).map(p => p.charAt(0).toUpperCase()).join('');
+        const lastName = parts[parts.length - 1]; // First name in VN context
+        // Try to capitalize last name properly if not already
+        const formattedLastName = lastName.charAt(0).toUpperCase() + lastName.slice(1);
+        
+        return `${initials}${formattedLastName}`;
+      };
 
       setOffsetData(
-        sortedStats.map(t => [t.teacherName, t.offsetClassCount || 0])
+        sortedStats.map(t => [abbreviateName(t.teacherName), t.offsetClassCount || 0])
+      );
+
+      setSupplementaryData(
+        sortedStats.map(t => [abbreviateName(t.teacherName), t.supplementaryClassCount || 0])
+      );
+
+      // Data for Test Classes chart (we need to map teacher names correctly)
+      // Since testClassStats.byTeacher is grouped by teacher ID, we can use sortedStats which has teacher IDs
+      setTestClassData(
+        sortedStats.map(t => {
+          const count = testClassStats.byTeacher && testClassStats.byTeacher[t.teacherId] 
+            ? testClassStats.byTeacher[t.teacherId].total 
+            : 0;
+          return [abbreviateName(t.teacherName), count];
+        })
       );
 
       setTeacherHoursData(
-        sortedStats.map(t => [t.teacherName, t.totalHours || 0])
+        sortedStats.map(t => [abbreviateName(t.teacherName), t.totalHours || 0])
       );
 
       setLoading(false);
@@ -203,6 +249,19 @@ const Dashboard = () => {
     ],
   };
 
+  const supplementaryClassesChartData = {
+    labels: supplementaryData.map(([name]) => name),
+    datasets: [
+      {
+        label: 'Số lớp bổ trợ',
+        data: supplementaryData.map(([, count]) => count),
+        backgroundColor: chartTheme.warning,
+        borderRadius: 6,
+        barThickness: 20,
+      },
+    ],
+  };
+
   const teachingHoursChartData = {
     labels: teacherHoursData.map(([name]) => name),
     datasets: [
@@ -210,6 +269,19 @@ const Dashboard = () => {
         label: 'Số giờ dạy',
         data: teacherHoursData.map(([, hours]) => hours.toFixed(1)),
         backgroundColor: chartTheme.success,
+        borderRadius: 6,
+        barThickness: 20,
+      },
+    ],
+  };
+
+  const testClassesChartData = {
+    labels: testClassData.map(([name]) => name),
+    datasets: [
+      {
+        label: 'Số lớp Test',
+        data: testClassData.map(([, count]) => count),
+        backgroundColor: '#f97316', // Orange 500
         borderRadius: 6,
         barThickness: 20,
       },
@@ -300,11 +372,19 @@ const Dashboard = () => {
           color="indigo"
         />
         <StatsCard
+          title="Lớp Test"
+          value={stats.totalTestClasses}
+          icon={ClipboardCheck}
+          color="purple"
+        />
+
+        <StatsCard
           title="Lớp Offset"
           value={stats.totalOffsetClasses}
           icon={BookMarked}
           color="blue"
         />
+      
         <StatsCard
           title="Chưa phân công"
           value={stats.pendingClasses}
@@ -319,7 +399,7 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Charts Grid */}
+      {/* Charts Grid Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Chart */}
         <Card className="lg:col-span-2">
@@ -367,9 +447,27 @@ const Dashboard = () => {
             </div>
           </div>
         </Card>
+      </div>
 
-        {/* Secondary Chart */}
-        <Card className="lg:col-span-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Test Classes Chart */}
+        <Card>
+          <h3 className="text-lg font-bold text-secondary-900 mb-6">Phân bố lớp Test</h3>
+          <div className="h-80">
+            <Bar data={testClassesChartData} options={commonOptions} />
+          </div>
+        </Card>
+
+        {/* Supplementary Classes Chart */}
+        <Card>
+          <h3 className="text-lg font-bold text-secondary-900 mb-6">Phân bố lớp Bổ trợ</h3>
+          <div className="h-80">
+            <Bar data={supplementaryClassesChartData} options={commonOptions} />
+          </div>
+        </Card>
+
+        {/* Offset Classes Chart */}
+        <Card className="lg:col-span-2">
           <h3 className="text-lg font-bold text-secondary-900 mb-6">Phân bố lớp Offset</h3>
           <div className="h-80">
             <Bar data={offsetClassesChartData} options={commonOptions} />

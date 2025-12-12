@@ -16,6 +16,7 @@ const Teachers = () => {
     phone: '',
     maxOffsetClasses: 5,
     status: 'active',
+    role: 'fulltime',
   });
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,7 +46,7 @@ const Teachers = () => {
         await teachersAPI.create(formData);
       }
       setShowModal(false);
-      setFormData({ name: '', email: '', phone: '', maxOffsetClasses: 5, status: 'active' });
+      setFormData({ name: '', email: '', phone: '', maxOffsetClasses: 5, status: 'active', role: 'fulltime' });
       setEditingId(null);
       loadTeachers();
     } catch (error) {
@@ -61,6 +62,7 @@ const Teachers = () => {
       phone: teacher.phone || '',
       maxOffsetClasses: teacher.maxOffsetClasses || 5,
       status: teacher.status,
+      role: teacher.role || 'fulltime',
     });
     setEditingId(teacher._id);
     setShowModal(true);
@@ -118,7 +120,7 @@ const Teachers = () => {
         </div>
         <Button
           onClick={() => {
-            setFormData({ name: '', email: '', phone: '', maxOffsetClasses: 5, status: 'active' });
+            setFormData({ name: '', email: '', phone: '', maxOffsetClasses: 5, status: 'active', role: 'fulltime' });
             setEditingId(null);
             setShowModal(true);
           }}
@@ -163,10 +165,13 @@ const Teachers = () => {
                   Liên hệ
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">
-                  Số lớp offset tối đa
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">
-                  Trạng thái
+                   Số lớp offset tối đa
+                 </th>
+                 <th className="px-6 py-3 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">
+                   Vai trò
+                 </th>
+                 <th className="px-6 py-3 text-left text-xs font-semibold text-secondary-500 uppercase tracking-wider">
+                   Trạng thái
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-semibold text-secondary-500 uppercase tracking-wider">
                   Thao tác
@@ -207,8 +212,17 @@ const Teachers = () => {
                     <span className="text-sm font-medium text-secondary-900 bg-secondary-100 px-2 py-1 rounded-md">
                       {teacher.maxOffsetClasses || 0} lớp
                     </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                   </td>
+                   <td className="px-6 py-4 whitespace-nowrap">
+                     <span className={`text-sm font-medium px-2 py-1 rounded-md ${
+                       teacher.role === 'fulltime' 
+                         ? 'bg-blue-100 text-blue-700' 
+                         : 'bg-purple-100 text-purple-700'
+                     }`}>
+                       {teacher.role === 'parttime' ? 'Part-time' : 'Full-time'}
+                     </span>
+                   </td>
+                   <td className="px-6 py-4 whitespace-nowrap">
                     {getStatusBadge(teacher.status)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -338,14 +352,27 @@ const Teachers = () => {
                       <option value="on_leave">Nghỉ phép</option>
                     </select>
                   </div>
-                  
-                  <div className="mt-6 flex gap-3 justify-end pt-4 border-t border-secondary-100">
+                   <div>
+                     <label className="block text-sm font-medium text-secondary-700 mb-1">
+                       Vai trò
+                     </label>
+                     <select
+                       value={formData.role}
+                       onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                       className="w-full px-3 py-2 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+                     >
+                       <option value="fulltime">Full-time</option>
+                       <option value="parttime">Part-time</option>
+                     </select>
+                   </div>
+                   
+                   <div className="mt-6 flex gap-3 justify-end pt-4 border-t border-secondary-100">
                     <Button
                       variant="secondary"
                       onClick={() => {
                         setShowModal(false);
                         setEditingId(null);
-                        setFormData({ name: '', email: '', phone: '', maxOffsetClasses: 5, status: 'active' });
+                        setFormData({ name: '', email: '', phone: '', maxOffsetClasses: 5, status: 'active', role: 'fulltime' });
                       }}
                     >
                       Hủy

@@ -113,6 +113,9 @@ export const dashboardAPI = {
   // Get offset class statistics
   getOffsetClassStatistics: (params) => api.get('/dashboard/offset-statistics', { params }),
 
+  // Get test class statistics
+  getTestClassStatistics: (params) => api.get('/dashboard/test-class-statistics', { params }),
+
   // Legacy methods for backward compatibility
   getTeacherStats: async (teacherId, startDate, endDate) => {
     const [offsetClasses, workShifts] = await Promise.all([
@@ -162,6 +165,34 @@ export const notificationsAPI = {
   markAllAsRead: () => api.patch('/notifications/read-all'),
   delete: (id) => api.delete(`/notifications/${id}`),
   clearRead: () => api.delete('/notifications/clear-read')
+};
+
+// Supplementary Classes API
+export const supplementaryClassesAPI = {
+  getAll: (params) => api.get('/supplementary-classes', { params }),
+  getById: (id) => api.get(`/supplementary-classes/${id}`),
+  create: (data) => api.post('/supplementary-classes', data),
+  createWithAssignment: (data) => api.post('/supplementary-classes/with-assignment', data),
+  update: (id, data) => api.put(`/supplementary-classes/${id}`, data),
+  delete: (id) => api.delete(`/supplementary-classes/${id}`),
+  autoAssign: (id) => api.post(`/supplementary-classes/${id}/auto-assign`),
+  reallocate: (id) => api.post(`/supplementary-classes/${id}/reallocate`),
+  markCompleted: (id) => api.patch(`/supplementary-classes/${id}/complete`),
+  cancel: (id, reason) => api.patch(`/supplementary-classes/${id}/cancel`, { reason }),
+};
+
+// Test Classes API
+export const testClassesAPI = {
+  getAll: (params) => api.get('/test-classes', { params }),
+  getById: (id) => api.get(`/test-classes/${id}`),
+  create: (data) => api.post('/test-classes', data),
+  createWithAssignment: (data) => api.post('/test-classes/with-assignment', data),
+  update: (id, data) => api.put(`/test-classes/${id}`, data),
+  delete: (id) => api.delete(`/test-classes/${id}`),
+  autoAssign: (id) => api.post(`/test-classes/${id}/auto-assign`),
+  reallocate: (id) => api.post(`/test-classes/${id}/reallocate`),
+  markCompleted: (id) => api.patch(`/test-classes/${id}/complete`),
+  cancel: (id, reason) => api.patch(`/test-classes/${id}/cancel`, { reason }),
 };
 
 export default api;

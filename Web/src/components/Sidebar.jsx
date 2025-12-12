@@ -7,7 +7,9 @@ import {
   Calendar,
   BookMarked,
   GraduationCap,
-  UserPlus
+  UserPlus,
+  Layers,
+  ClipboardCheck
 } from 'lucide-react';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -19,6 +21,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     { path: '/subjects', icon: BookOpen, label: 'Môn học' },
     { path: '/schedule', icon: Calendar, label: 'Lịch làm việc' },
     { path: '/offset-classes', icon: BookMarked, label: 'Lớp Offset' },
+    { path: '/supplementary-classes', icon: Layers, label: 'Lớp Bổ Trợ' },
+    { path: '/test-classes', icon: ClipboardCheck, label: 'Lớp Test' },
     { path: '/leave-requests', icon: UserPlus, label: 'Yêu cầu nghỉ' },
   ];
 

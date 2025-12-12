@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import { scheduleAPI, teachersAPI, fixedScheduleLeaveAPI, offsetClassesAPI, subjectsAPI } from '../services/api';
+import { scheduleAPI, teachersAPI, fixedScheduleLeaveAPI, offsetClassesAPI, subjectsAPI, supplementaryClassesAPI, testClassesAPI } from '../services/api';
 import Button from '../components/ui/Button';
 import ScheduleFilters from '../components/schedule/ScheduleFilters';
 import ScheduleCalendar from '../components/schedule/ScheduleCalendar';
@@ -11,6 +11,9 @@ import {
   QuickCreateModal, 
   OffsetClassModal, 
   FixedScheduleModal,
+
+  SupplementaryClassModal,
+  TestClassModal,
   // Import other modals if they were exported separately or handle them here if simple
 } from '../components/schedule/ScheduleModals';
 import { useNotification } from '../components/ui/NotificationProvider';
@@ -86,6 +89,8 @@ const Schedule = () => {
   const [subjects, setSubjects] = useState([]);
   const [subjectLevels, setSubjectLevels] = useState([]);
   const [allTeachersDetails, setAllTeachersDetails] = useState([]);
+  const [supplementaryClasses, setSupplementaryClasses] = useState([]);
+  const [testClasses, setTestClasses] = useState([]);
 
   // Filter states
   const defaultRange = getDefaultViewRange();
@@ -101,9 +106,16 @@ const Schedule = () => {
   const [showQuickCreateModal, setShowQuickCreateModal] = useState(false);
   const [showOffsetClassForm, setShowOffsetClassForm] = useState(false);
   const [showFixedScheduleForm, setShowFixedScheduleForm] = useState(false);
+
+  const [showSupplementaryClassForm, setShowSupplementaryClassForm] = useState(false);
+  const [showTestClassForm, setShowTestClassForm] = useState(false);
   const [showCancelOffsetModal, setShowCancelOffsetModal] = useState(false);
   const [showEditOffsetModal, setShowEditOffsetModal] = useState(false);
   const [showDeleteOffsetModal, setShowDeleteOffsetModal] = useState(false);
+  const [showEditSupplementaryModal, setShowEditSupplementaryModal] = useState(false);
+  const [showDeleteSupplementaryModal, setShowDeleteSupplementaryModal] = useState(false);
+  const [showEditTestModal, setShowEditTestModal] = useState(false);
+  const [showDeleteTestModal, setShowDeleteTestModal] = useState(false);
 
   // Selection states
   const [selectedSchedule, setSelectedSchedule] = useState(null);
@@ -111,6 +123,10 @@ const Schedule = () => {
   const [offsetToCancel, setOffsetToCancel] = useState(null);
   const [offsetToEdit, setOffsetToEdit] = useState(null);
   const [offsetToDelete, setOffsetToDelete] = useState(null);
+  const [supplementaryToEdit, setSupplementaryToEdit] = useState(null);
+  const [supplementaryToDelete, setSupplementaryToDelete] = useState(null);
+  const [testToEdit, setTestToEdit] = useState(null);
+  const [testToDelete, setTestToDelete] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
 
   // Form states
@@ -143,7 +159,42 @@ const Schedule = () => {
     endDate: '',
   });
 
+  const [supplementaryClassFormData, setSupplementaryClassFormData] = useState({
+    subjectLevelId: '',
+    className: '',
+    startTime: '',
+    endTime: '',
+    meetingLink: '',
+    notes: '',
+  });
+
+  const [testClassFormData, setTestClassFormData] = useState({
+    subjectId: '',
+    className: '',
+    scheduledDate: '',
+    startTime: '',
+    endTime: '',
+    meetingLink: '',
+    notes: '',
+    assignedTeacherId: '',
+    reason: ''
+  });
+
   const [editOffsetForm, setEditOffsetForm] = useState({
+    assignedTeacherId: '',
+    scheduledDate: '',
+    startTime: '',
+    endTime: ''
+  });
+
+  const [editSupplementaryForm, setEditSupplementaryForm] = useState({
+    assignedTeacherId: '',
+    scheduledDate: '',
+    startTime: '',
+    endTime: ''
+  });
+
+  const [editTestForm, setEditTestForm] = useState({
     assignedTeacherId: '',
     scheduledDate: '',
     startTime: '',
@@ -175,6 +226,22 @@ const Schedule = () => {
       setFixedScheduleLeaves(leavesRes.data);
       setOffsetClasses(offsetRes.data);
       setSubjects(subjectsRes.data);
+
+      try {
+        const suppRes = await supplementaryClassesAPI.getAll({ limit: 1000 });
+        const suppData = suppRes.data.data || suppRes.data || [];
+        setSupplementaryClasses(suppData);
+      } catch (err) {
+        console.error('Error fetching supplementary classes:', err);
+      }
+
+      try {
+        const testRes = await testClassesAPI.getAll({ limit: 1000 });
+        const testData = testRes.data.data || testRes.data || [];
+        setTestClasses(testData);
+      } catch (err) {
+        console.error('Error fetching test classes:', err);
+      }
 
       // Fetch full details for teachers to get their fixed schedules
       const teacherDetailsPromises = teachersRes.data.map(t => teachersAPI.getDetails(t._id));
@@ -221,10 +288,10 @@ const Schedule = () => {
       }
     };
 
-    if (showOffsetClassForm) {
+    if (showOffsetClassForm || showSupplementaryClassForm) {
       fetchSubjectLevels();
     }
-  }, [showOffsetClassForm]);
+  }, [showOffsetClassForm, showSupplementaryClassForm]);
 
   // Handle date range calculation for Create Schedule Modal
   useEffect(() => {
@@ -391,6 +458,79 @@ const Schedule = () => {
     } catch (error) {
       console.error('Error creating offset class:', error);
       showNotification('Lỗi khi tạo lớp offset', 'error');
+    }
+  };
+
+
+  const handleSupplementaryClassSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await supplementaryClassesAPI.createWithAssignment({
+        ...supplementaryClassFormData,
+        assignedTeacherId: quickCreateData.teacherId,
+        scheduledDate: quickCreateData.date,
+        status: 'assigned'
+      });
+      
+      showNotification('Tạo lớp bổ trợ thành công', 'success');
+      setShowSupplementaryClassForm(false);
+      setShowQuickCreateModal(false);
+      setSupplementaryClassFormData({
+        subjectLevelId: '',
+        className: '',
+        startTime: '',
+        endTime: '',
+        meetingLink: '',
+        notes: '',
+      });
+      loadData();
+    } catch (error) {
+      console.error('Error creating supplementary class:', error);
+      showNotification('Lỗi khi tạo lớp bổ trợ', 'error');
+    }
+  };
+
+  const handleTestClassSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const createData = { ...testClassFormData };
+      // Override with quickCreateData details if needed, but form should have them
+      createData.scheduledDate = quickCreateData.date;
+      
+      let response;
+      if (!createData.assignedTeacherId || createData.assignedTeacherId === '') {
+        // Auto assign
+        delete createData.assignedTeacherId;
+        response = await testClassesAPI.createWithAssignment(createData);
+        if (response.autoAssigned) {
+          showNotification('Tạo lớp test và tự động phân công thành công', 'success');
+        } else {
+          showNotification('Tạo lớp test thành công nhưng không tìm thấy giáo viên phù hợp', 'warning');
+        }
+      } else {
+        // Manual assign
+        createData.status = 'pending';
+        response = await testClassesAPI.create(createData);
+        showNotification('Tạo lớp test thành công', 'success');
+      }
+
+      setShowTestClassForm(false);
+      setShowQuickCreateModal(false);
+      setTestClassFormData({
+        subjectId: '',
+        className: '',
+        scheduledDate: '',
+        startTime: '',
+        endTime: '',
+        meetingLink: '',
+        notes: '',
+        assignedTeacherId: '',
+        reason: ''
+      });
+      loadData();
+    } catch (error) {
+      console.error('Error creating test class:', error);
+      showNotification('Lỗi khi tạo lớp test', 'error');
     }
   };
 
@@ -637,6 +777,23 @@ const Schedule = () => {
     setShowDeleteOffsetModal(true);
   };
 
+  const handleAddOffsetDirectly = (teacherId, date, startTime, endTime) => {
+    setQuickCreateData({
+      teacherId,
+      date,
+      // We don't have teacherName here easily, but OffsetClassModal uses quickCreateData.teacherId mostly?
+      // Actually QuickCreateModal has teacherName. OffsetClassModal uses quickCreateData for defaults.
+      // We should try to find teacherName if possible, or just pass ID.
+      // The modal uses basic info.
+    });
+    setOffsetClassFormData(prev => ({
+      ...prev,
+      startTime: startTime || '',
+      endTime: endTime || ''
+    }));
+    setShowOffsetClassForm(true);
+  };
+
   const handleCancelOffsetSubmit = async () => {
     try {
       await offsetClassesAPI.cancel(offsetToCancel._id, { reason: cancelReason });
@@ -681,6 +838,94 @@ const Schedule = () => {
     } catch (error) {
       console.error('Error deleting offset:', error);
       showNotification('Lỗi khi xóa lớp offset', 'error');
+    }
+  };
+
+  // Handlers for supplementary classes
+  const handleEditSupplementary = (sc) => {
+    setSupplementaryToEdit(sc);
+    setEditSupplementaryForm({
+      assignedTeacherId: typeof sc.assignedTeacherId === 'object' ? sc.assignedTeacherId._id : sc.assignedTeacherId,
+      scheduledDate: sc.scheduledDate ? new Date(sc.scheduledDate).toISOString().split('T')[0] : '',
+      startTime: sc.startTime || '',
+      endTime: sc.endTime || ''
+    });
+    setShowEditSupplementaryModal(true);
+  };
+
+  const handleDeleteSupplementary = (sc) => {
+    setSupplementaryToDelete(sc);
+    setShowDeleteSupplementaryModal(true);
+  };
+
+  const handleEditSupplementarySubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await supplementaryClassesAPI.update(supplementaryToEdit._id, editSupplementaryForm);
+      showNotification('Cập nhật lớp bổ trợ thành công', 'success');
+      setShowEditSupplementaryModal(false);
+      setSupplementaryToEdit(null);
+      loadData();
+    } catch (error) {
+      console.error('Error updating supplementary:', error);
+      showNotification('Lỗi khi cập nhật lớp bổ trợ', 'error');
+    }
+  };
+
+  const handleDeleteSupplementarySubmit = async () => {
+    try {
+      await supplementaryClassesAPI.delete(supplementaryToDelete._id);
+      showNotification('Đã xóa lớp bổ trợ', 'success');
+      setShowDeleteSupplementaryModal(false);
+      setSupplementaryToDelete(null);
+      loadData();
+    } catch (error) {
+      console.error('Error deleting supplementary:', error);
+      showNotification('Lỗi khi xóa lớp bổ trợ', 'error');
+    }
+  };
+
+  // Handlers for test classes
+  const handleEditTest = (tc) => {
+    setTestToEdit(tc);
+    setEditTestForm({
+      assignedTeacherId: typeof tc.assignedTeacherId === 'object' ? tc.assignedTeacherId._id : tc.assignedTeacherId,
+      scheduledDate: tc.scheduledDate ? new Date(tc.scheduledDate).toISOString().split('T')[0] : '',
+      startTime: tc.startTime || '',
+      endTime: tc.endTime || ''
+    });
+    setShowEditTestModal(true);
+  };
+
+  const handleDeleteTest = (tc) => {
+    setTestToDelete(tc);
+    setShowDeleteTestModal(true);
+  };
+
+  const handleEditTestSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await testClassesAPI.update(testToEdit._id, editTestForm);
+      showNotification('Cập nhật lớp test thành công', 'success');
+      setShowEditTestModal(false);
+      setTestToEdit(null);
+      loadData();
+    } catch (error) {
+      console.error('Error updating test:', error);
+      showNotification('Lỗi khi cập nhật lớp test', 'error');
+    }
+  };
+
+  const handleDeleteTestSubmit = async () => {
+    try {
+      await testClassesAPI.delete(testToDelete._id);
+      showNotification('Đã xóa lớp test', 'success');
+      setShowDeleteTestModal(false);
+      setTestToDelete(null);
+      loadData();
+    } catch (error) {
+      console.error('Error deleting test:', error);
+      showNotification('Lỗi khi xóa lớp test', 'error');
     }
   };
 
@@ -738,6 +983,13 @@ const Schedule = () => {
           onEditOffset={handleEditOffset}
           onCancelOffset={handleCancelOffset}
           onDeleteOffset={handleDeleteOffset}
+          onAddOffset={handleAddOffsetDirectly}
+          supplementaryClasses={supplementaryClasses}
+          testClasses={testClasses}
+          onEditSupplementary={handleEditSupplementary}
+          onDeleteSupplementary={handleDeleteSupplementary}
+          onEditTest={handleEditTest}
+          onDeleteTest={handleDeleteTest}
         />
       )}
 
@@ -776,6 +1028,16 @@ const Schedule = () => {
         data={quickCreateData}
         onOpenOffsetForm={() => setShowOffsetClassForm(true)}
         onOpenFixedForm={() => setShowFixedScheduleForm(true)}
+
+        onOpenSupplementaryForm={() => setShowSupplementaryClassForm(true)}
+        onOpenTestForm={() => {
+          setTestClassFormData(prev => ({ 
+            ...prev, 
+            assignedTeacherId: '', // Reset to allow auto-fill from quickCreateData
+            scheduledDate: ''      // Reset date too
+          }));
+          setShowTestClassForm(true);
+        }}
       />
 
       <OffsetClassModal
@@ -788,6 +1050,16 @@ const Schedule = () => {
         quickCreateData={quickCreateData}
       />
 
+      <SupplementaryClassModal
+        show={showSupplementaryClassForm}
+        onClose={() => setShowSupplementaryClassForm(false)}
+        formData={supplementaryClassFormData}
+        setFormData={setSupplementaryClassFormData}
+        subjectLevels={subjectLevels}
+        handleSubmit={handleSupplementaryClassSubmit}
+        quickCreateData={quickCreateData}
+      />
+
       <FixedScheduleModal
         show={showFixedScheduleForm}
         onClose={() => setShowFixedScheduleForm(false)}
@@ -795,6 +1067,17 @@ const Schedule = () => {
         setFormData={setFixedScheduleFormData}
         subjects={subjects}
         handleSubmit={handleFixedScheduleSubmit}
+        quickCreateData={quickCreateData}
+      />
+
+      <TestClassModal
+        show={showTestClassForm}
+        onClose={() => setShowTestClassForm(false)}
+        formData={testClassFormData}
+        setFormData={setTestClassFormData}
+        subjects={subjects}
+        teachers={teachers}
+        handleSubmit={handleTestClassSubmit}
         quickCreateData={quickCreateData}
       />
 
@@ -887,6 +1170,144 @@ const Schedule = () => {
                 <Button type="submit" className="flex-1">Cập nhật</Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Supplementary Modal */}
+      {showEditSupplementaryModal && supplementaryToEdit && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-bold mb-4">Sửa lớp bổ trợ</h3>
+            <form onSubmit={handleEditSupplementarySubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-1">Giáo viên</label>
+                <select
+                  value={editSupplementaryForm.assignedTeacherId}
+                  onChange={(e) => setEditSupplementaryForm({ ...editSupplementaryForm, assignedTeacherId: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  <option value="">-- Chọn giáo viên --</option>
+                  {teachers.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-1">Ngày</label>
+                <input
+                  type="date"
+                  value={editSupplementaryForm.scheduledDate}
+                  onChange={(e) => setEditSupplementaryForm({ ...editSupplementaryForm, scheduledDate: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">Bắt đầu</label>
+                  <input
+                    type="time"
+                    value={editSupplementaryForm.startTime}
+                    onChange={(e) => setEditSupplementaryForm({ ...editSupplementaryForm, startTime: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">Kết thúc</label>
+                  <input
+                    type="time"
+                    value={editSupplementaryForm.endTime}
+                    onChange={(e) => setEditSupplementaryForm({ ...editSupplementaryForm, endTime: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button variant="secondary" onClick={() => setShowEditSupplementaryModal(false)} className="flex-1">Hủy</Button>
+                <Button type="submit" className="flex-1">Cập nhật</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Supplementary Modal */}
+      {showDeleteSupplementaryModal && supplementaryToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-bold mb-4">Xác nhận xóa lớp bổ trợ</h3>
+            <p className="text-secondary-600 mb-4">Bạn có chắc muốn xóa lớp "<strong>{supplementaryToDelete.className}</strong>"?</p>
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={() => setShowDeleteSupplementaryModal(false)} className="flex-1">Hủy</Button>
+              <Button variant="danger" onClick={handleDeleteSupplementarySubmit} className="flex-1">Xóa</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Test Modal */}
+      {showEditTestModal && testToEdit && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-bold mb-4">Sửa lớp test</h3>
+            <form onSubmit={handleEditTestSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-1">Giáo viên</label>
+                <select
+                  value={editTestForm.assignedTeacherId}
+                  onChange={(e) => setEditTestForm({ ...editTestForm, assignedTeacherId: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  <option value="">-- Chọn giáo viên --</option>
+                  {teachers.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-secondary-700 mb-1">Ngày</label>
+                <input
+                  type="date"
+                  value={editTestForm.scheduledDate}
+                  onChange={(e) => setEditTestForm({ ...editTestForm, scheduledDate: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">Bắt đầu</label>
+                  <input
+                    type="time"
+                    value={editTestForm.startTime}
+                    onChange={(e) => setEditTestForm({ ...editTestForm, startTime: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-secondary-700 mb-1">Kết thúc</label>
+                  <input
+                    type="time"
+                    value={editTestForm.endTime}
+                    onChange={(e) => setEditTestForm({ ...editTestForm, endTime: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button variant="secondary" onClick={() => setShowEditTestModal(false)} className="flex-1">Hủy</Button>
+                <Button type="submit" className="flex-1">Cập nhật</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Test Modal */}
+      {showDeleteTestModal && testToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-bold mb-4">Xác nhận xóa lớp test</h3>
+            <p className="text-secondary-600 mb-4">Bạn có chắc muốn xóa lớp "<strong>{testToDelete.className}</strong>"?</p>
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={() => setShowDeleteTestModal(false)} className="flex-1">Hủy</Button>
+              <Button variant="danger" onClick={handleDeleteTestSubmit} className="flex-1">Xóa</Button>
+            </div>
           </div>
         </div>
       )}
