@@ -139,7 +139,7 @@ export const createSupplementaryClassWithAssignment = async (req, res) => {
             supplementaryClass.assignedHistory = [];
         } else {
             // No teacher provided, do auto-assignment
-            suitableTeacher = await offsetAllocationService.findSuitableTeacher(supplementaryClass);
+            suitableTeacher = await offsetAllocationService.findSuitableTeacher(supplementaryClass, null, 'priority');
 
             if (suitableTeacher) {
                 supplementaryClass.assignedTeacherId = suitableTeacher._id;
@@ -211,7 +211,7 @@ export const autoAssignTeacher = async (req, res) => {
             });
         }
 
-        const suitableTeacher = await offsetAllocationService.findSuitableTeacher(supplementaryClass);
+        const suitableTeacher = await offsetAllocationService.findSuitableTeacher(supplementaryClass, null, 'priority');
 
         if (!suitableTeacher) {
             return res.status(404).json({
@@ -298,7 +298,7 @@ export const reallocateTeacher = async (req, res) => {
         // For now let's save.
         await supplementaryClass.save();
 
-        const newTeacher = await offsetAllocationService.findSuitableTeacher(supplementaryClass);
+        const newTeacher = await offsetAllocationService.findSuitableTeacher(supplementaryClass, supplementaryClass.assignedHistory, 'priority');
 
         if (!newTeacher) {
             return res.status(404).json({

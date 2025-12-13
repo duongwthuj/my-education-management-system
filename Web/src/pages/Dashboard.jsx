@@ -100,8 +100,8 @@ const Dashboard = () => {
     try {
       setLoading(true);
 
-      // Load teachers
-      const teachersRes = await teachersAPI.getAll({ limit: 1000 });
+      // Load teachers (only active)
+      const teachersRes = await teachersAPI.getAll({ limit: 1000, status: 'active' });
       const teachersData = teachersRes.data || teachersRes || [];
       setTeachers(Array.isArray(teachersData) ? teachersData : []);
 
@@ -385,18 +385,8 @@ const Dashboard = () => {
           color="blue"
         />
       
-        <StatsCard
-          title="Chưa phân công"
-          value={stats.pendingClasses}
-          icon={AlertCircle}
-          color="red"
-        />
-        <StatsCard
-          title="Đã hoàn thành"
-          value={stats.completedClasses}
-          icon={CheckCircle}
-          color="green"
-        />
+      
+        
       </div>
 
       {/* Charts Grid Row 1 */}

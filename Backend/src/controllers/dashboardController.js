@@ -82,12 +82,12 @@ export const getTeachingHoursStats = async (req, res) => {
       });
     }
 
-    // Build query filter
-    const teacherFilter = teacherId ? { _id: teacherId } : {};
+    // Build query filter (only active teachers)
+    const teacherFilter = teacherId ? { _id: teacherId, status: 'active' } : { status: 'active' };
 
-    // Get all teachers with their fixed schedules
+    // Get all active teachers with their fixed schedules
     const teachers = await Teacher.find(teacherFilter)
-      .select('_id name email')
+      .select('_id name email status')
       .lean();
 
     const teacherStats = [];

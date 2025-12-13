@@ -4,6 +4,8 @@ import WorkShift from '../models/workShift.js';
 import FixedSchedule from '../models/fixedScheduled.js';
 import OffsetClass from '../models/offsetClass.js';
 import FixedScheduleLeave from '../models/fixedScheduleLeave.js';
+import SupplementaryClass from '../models/supplementaryClass.js';
+import TestClass from '../models/testClass.js';
 
 /**
  * Service để phân bổ lớp offset cho giáo viên
@@ -17,10 +19,10 @@ class OffsetAllocationService {
      * @param {Array|string|null} excludeTeacherIds - ID giáo viên cần loại trừ (mảng hoặc single id)
      * @returns {Object|null} - Giáo viên được chọn hoặc null
      */
-    async findSuitableTeacher(offsetClass, excludeTeacherIds = null) {
+    async findSuitableTeacher(offsetClass, excludeTeacherIds = null, strategy = 'balance') {
         const { subjectLevelId, scheduledDate, startTime, endTime } = offsetClass;
 
-        console.log('\n🔍 Finding suitable teacher for offset class:');
+        console.log(`\n🔍 Finding suitable teacher for class (${strategy} strategy):`);
         console.log(`   📅 Date: ${scheduledDate}`);
         console.log(`   ⏰ Time: ${startTime} - ${endTime}`);
         console.log(`   📚 Subject Level: ${subjectLevelId}`);
@@ -165,7 +167,7 @@ class OffsetAllocationService {
             console.log(
                 `      - ${tw.teacher.name}: ${tw.workload.totalHours.toFixed(
                     1
-                )}h, ${tw.workload.offsetCount} offsets`
+                )}h, ${tw.workload.offsetCount} offsets, role: ${tw.teacher.role}`
             );
         });
 
@@ -187,7 +189,8 @@ class OffsetAllocationService {
                     experienceYears,
                     workload,
                     { minHours, maxHours, minOffsets, maxOffsets },
-                    scheduleScore
+                    scheduleScore,
+                    strategy
                 );
                 console.log(`   💯 Final score for ${teacher.name}: ${score}`);
                 return { teacher, score };
@@ -223,15 +226,6 @@ class OffsetAllocationService {
 
     /**
      * Tính điểm phù hợp của giáo viên cho lớp offset
-     * @param {Object} teacher - Giáo viên
-     * @param {Date} scheduledDate - Ngày dự kiến
-     * @param {String} startTime - Giờ bắt đầu
-     * @param {String} endTime - Giờ kết thúc
-     * @param {Number} experienceYears - Số năm kinh nghiệm
-     * @param {Object} workload - Thông tin workload của giáo viên
-     * @param {Object} ranges - Phạm vi min/max để tính điểm tương đối
-     * @param {Number} scheduleScore - Điểm lịch làm việc đã tính sẵn
-     * @returns {Number} - Điểm tổng hợp
      */
     async calculateTeacherScore(
         teacher,
@@ -241,7 +235,8 @@ class OffsetAllocationService {
         experienceYears,
         workload,
         ranges,
-        scheduleScore
+        scheduleScore,
+        strategy = 'balance'
     ) {
         console.log(
             `   🔁 Using precomputed scheduleScore for ${teacher.name}: ${scheduleScore}`
@@ -254,17 +249,34 @@ class OffsetAllocationService {
             return 0;
         }
 
-        let score = scheduleScore * 0.5;
+        // STRATEGY: BALANCE (Phân bổ lớp offset)
+        // Ưu tiên: Lịch (50%) + Cân bằng (50%)
+        if (strategy === 'balance') {
+            let score = scheduleScore * 0.5;
+            const balanceScore = this.calculateBalanceScore(workload, ranges);
+            score += balanceScore * 0.5;
 
-        // Cân bằng số lớp (50%)
-        const balanceScore = this.calculateBalanceScore(workload, ranges);
-        score += balanceScore * 0.5;
+            console.log(
+                `   📊 Breakdown (Balance): Schedule(${scheduleScore}×0.5) + Balance(${balanceScore}×0.5) = ${score}`
+            );
+            return score;
+        }
 
-        console.log(
-            `   📊 Breakdown: Schedule(${scheduleScore}×0.5) + Balance(${balanceScore}×0.5) = ${score}`
-        );
+        // STRATEGY: PRIORITY (Phân bổ lớp bổ trợ - Supplementary)
+        // Ưu tiên giáo viên dạy NHIỀU (positive allocation)
+        // Parttime (50%) + Offset Count (30%) + Teaching Hours (20%)
+        else if (strategy === 'priority') {
+            const priorityScore = this.calculatePriorityScore(teacher, workload, ranges);
+            // Schedule score check already passed (is > 0), so we just use the priority score
+            // But if we want to factor in schedule quality (scheduleScore), we could mix it in.
+            // Requirement says: Parttime 50%, Offset 30%, Hours 20%. 
+            // This sums to 100%. We assume schedule availablity is a hard filter (done before).
 
-        return score;
+            console.log(`   📊 Breakdown (Priority): ${priorityScore}`);
+            return priorityScore;
+        }
+
+        return 0;
     }
 
     /**
@@ -444,6 +456,84 @@ class OffsetAllocationService {
             }
         }
 
+        // 4) SupplementaryClass – xung đột với các lớp bổ trợ
+        console.log(`   🔍 Checking existing supplementary classes(same local day)...`);
+        const existingSupplementaryClassesRaw = await SupplementaryClass.find({
+            assignedTeacherId: teacherId,
+            status: { $in: ['pending', 'assigned', 'completed'] },
+            scheduledDate: {
+                $gte: windowStart,
+                $lte: windowEnd
+            }
+        });
+
+        console.log(
+            `   📋 Found ${ existingSupplementaryClassesRaw.length } existing supplementary classes in ±36h window`
+        );
+
+        const existingSupplementaryClasses = existingSupplementaryClassesRaw.filter(sc => {
+            const scLocal = this.getLocalICTDateString(sc.scheduledDate);
+            const sameDay = scLocal === localDayStr;
+            return sameDay;
+        });
+
+        for (const sc of existingSupplementaryClasses) {
+            console.log(
+                `      🔍 Checking supplementary: ${ sc.className } ${ sc.startTime } -${ sc.endTime } (${ sc.status })`
+            );
+            const conflict = this.isTimeOverlap(
+                startTime,
+                endTime,
+                sc.startTime,
+                sc.endTime
+            );
+            if (conflict) {
+                console.log(
+                    `   ❌ REJECTED: Supplementary class conflict ${ sc.startTime } -${ sc.endTime } (${ sc.className })`
+                );
+                return 0;
+            }
+        }
+
+        // 5) TestClass – xung đột với các lớp test
+        console.log(`   🔍 Checking existing test classes(same local day)...`);
+        const existingTestClassesRaw = await TestClass.find({
+            assignedTeacherId: teacherId,
+            status: { $in: ['pending', 'assigned', 'completed'] },
+            scheduledDate: {
+                $gte: windowStart,
+                $lte: windowEnd
+            }
+        });
+
+        console.log(
+            `   📋 Found ${ existingTestClassesRaw.length } existing test classes in ±36h window`
+        );
+
+        const existingTestClasses = existingTestClassesRaw.filter(tc => {
+            const tcLocal = this.getLocalICTDateString(tc.scheduledDate);
+            const sameDay = tcLocal === localDayStr;
+            return sameDay;
+        });
+
+        for (const tc of existingTestClasses) {
+            console.log(
+                `      🔍 Checking test class: ${ tc.className } ${ tc.startTime } -${ tc.endTime } (${ tc.status })`
+            );
+            const conflict = this.isTimeOverlap(
+                startTime,
+                endTime,
+                tc.startTime,
+                tc.endTime
+            );
+            if (conflict) {
+                console.log(
+                    `   ❌ REJECTED: Test class conflict ${ tc.startTime } -${ tc.endTime } (${ tc.className })`
+                );
+                return 0;
+            }
+        }
+
         console.log(`   ✅ AVAILABLE: No conflicts found, score = 100`);
         return 100;
     }
@@ -456,12 +546,14 @@ class OffsetAllocationService {
         const { minHours, maxHours, minOffsets, maxOffsets } = ranges;
 
         console.log(
-            `   📚 Total hours (fixed + offset): ${totalHours.toFixed(
-                1
-            )} hours (range: ${minHours.toFixed(1)} - ${maxHours.toFixed(1)})`
+            `   📚 Total hours(fixed + offset): ${
+                    totalHours.toFixed(
+                        1
+                    )
+                } hours(range: ${ minHours.toFixed(1) } - ${ maxHours.toFixed(1) })`
         );
         console.log(
-            `   📊 Current offset classes: ${offsetCount} (range: ${minOffsets} - ${maxOffsets})`
+            `   📊 Current offset classes: ${ offsetCount } (range: ${ minOffsets } - ${ maxOffsets })`
         );
 
         let hoursScore = 100;
@@ -469,20 +561,27 @@ class OffsetAllocationService {
             const hoursRatio = (totalHours - minHours) / (maxHours - minHours);
             hoursScore = 100 - hoursRatio * 100;
             console.log(
-                `   🔢 Hours calculation: (${totalHours.toFixed(
-                    1
-                )} - ${minHours.toFixed(1)}) / (${maxHours.toFixed(
-                    1
-                )} - ${minHours.toFixed(1)}) = ${hoursRatio.toFixed(
+                `   🔢 Hours calculation: (${
+                    totalHours.toFixed(
+                        1
+                    )
+                } - ${ minHours.toFixed(1) }) / (${maxHours.toFixed(
+                1
+                )
+            } - ${ minHours.toFixed(1) }) = ${
+                hoursRatio.toFixed(
                     3
-                )} → score = ${hoursScore.toFixed(1)}`
+                )
+            } → score = ${ hoursScore.toFixed(1) } `
             );
         } else {
             hoursScore = 50;
             console.log(
-                `   ⚠️ All teachers have same hours (${totalHours.toFixed(
+                `   ⚠️ All teachers have same hours(${
+                totalHours.toFixed(
                     1
-                )}), using default score 50`
+                )
+            }), using default score 50`
             );
         }
 
@@ -491,14 +590,14 @@ class OffsetAllocationService {
             const offsetRatio = (offsetCount - minOffsets) / (maxOffsets - minOffsets);
             offsetScore = 100 - offsetRatio * 100;
             console.log(
-                `   🔢 Offset calculation: (${offsetCount} - ${minOffsets}) / (${maxOffsets} - ${minOffsets}) = ${offsetRatio.toFixed(
-                    3
-                )} → score = ${offsetScore.toFixed(1)}`
+                `   🔢 Offset calculation: (${ offsetCount } - ${ minOffsets }) / (${maxOffsets} - ${minOffsets}) = ${offsetRatio.toFixed(
+3
+                )} → score = ${ offsetScore.toFixed(1) } `
             );
         } else {
             offsetScore = 50;
             console.log(
-                `   ⚠️ All teachers have same offsets (${offsetCount}), using default score 50`
+                `   ⚠️ All teachers have same offsets(${ offsetCount }), using default score 50`
             );
         }
 
@@ -508,229 +607,156 @@ class OffsetAllocationService {
         const balanceScore = hoursScore * 0.95 + offsetScore * 0.05;
 
         console.log(
-            `   💯 Balance breakdown: Hours(${hoursScore.toFixed(
-                1
-            )}×0.95) + Offset(${offsetScore.toFixed(1)}×0.05) = ${balanceScore.toFixed(
-                1
-            )}`
+            `   💯 Balance breakdown: Hours(${
+    hoursScore.toFixed(
+        1
+    )
+}×0.95) + Offset(${ offsetScore.toFixed(1) }×0.05) = ${
+    balanceScore.toFixed(
+        1
+    )
+} `
         );
 
         return balanceScore;
     }
 
     /**
-     * Chuẩn hoá thời gian & chuyển sang phút
+     * Tính điểm ưu tiên (Priority Strategy)
+     * Ưu tiên giáo viên dạy NHIỀU
+     * 1. Parttime: 50% (parttime = 100, fulltime = 0)
+     * 2. Offset Count: 30% (càng nhiều càng tốt)
+     * 3. Teaching Hours: 20% (càng nhiều càng tốt)
      */
-    normalizeTime(timeStr) {
-        if (!timeStr) return null;
-        return timeStr.toString().trim().slice(0, 5); // HH:MM
-    }
+    calculatePriorityScore(teacher, workload, ranges) {
+        const { totalHours, offsetCount } = workload;
+        const { minHours, maxHours, minOffsets, maxOffsets } = ranges;
 
-    timeToMinutes(timeStr) {
-        const norm = this.normalizeTime(timeStr);
-        if (!norm || !norm.includes(':')) {
-            console.log('      ⚠️ Invalid time string:', timeStr);
-            return NaN;
+        // 1. Role Score (50%)
+        let roleScore = 0;
+        if (teacher.role === 'parttime') {
+            roleScore = 100;
         }
-        const [hours, minutes] = norm.split(':').map(Number);
-        return hours * 60 + minutes;
-    }
+        console.log(`   🔸 Role: ${ teacher.role } → ${ roleScore } (50 %)`);
 
-    /**
-     * Kiểm tra thời gian bắt đầu của lớp có nằm trong ca làm việc không
-     */
-    isTimeInRange(classStart, classEnd, shiftStart, shiftEnd) {
-        const cs = this.timeToMinutes(classStart);
-        const ss = this.timeToMinutes(shiftStart);
-        const se = this.timeToMinutes(shiftEnd);
-
-        const result = cs >= ss && cs < se;
-        console.log(
-            `      🔍 Time check (minutes): ${cs} >= ${ss} && ${cs} < ${se} = ${result} (${classStart} vs ${shiftStart}-${shiftEnd})`
-        );
-        return result;
-    }
-
-    /**
-     * Kiểm tra hai khoảng thời gian có chồng lấn không
-     */
-    isTimeOverlap(start1, end1, start2, end2) {
-        const s1 = this.timeToMinutes(start1);
-        const e1 = this.timeToMinutes(end1);
-        const s2 = this.timeToMinutes(start2);
-        const e2 = this.timeToMinutes(end2);
-
-        if ([s1, e1, s2, e2].some(v => Number.isNaN(v))) {
+        // 2. Offset Score (30%) - Higher is better
+        let offsetScore = 50;
+        if (maxOffsets > minOffsets) {
+            const offsetRatio = (offsetCount - minOffsets) / (maxOffsets - minOffsets);
+            offsetScore = offsetRatio * 100;
             console.log(
-                '      ⚠️ Cannot check overlap, invalid time(s):',
-                start1,
-                end1,
-                start2,
-                end2
+                `   🔸 Offset: (${ offsetCount } - ${ minOffsets }) / (${maxOffsets} - ${minOffsets}) = ${offsetRatio.toFixed(3)} → ${offsetScore.toFixed(1)} (30%)`
             );
-            return false;
-        }
+        } else {
+    console.log(`   🔸 Offset: All same (${offsetCount}) → 50 (30%)`);
+}
 
-        const overlap = s1 < e2 && e1 > s2;
+// 3. Hours Score (20%) - Higher is better
+let hoursScore = 50;
+if (maxHours > minHours) {
+    const hoursRatio = (totalHours - minHours) / (maxHours - minHours);
+    hoursScore = hoursRatio * 100;
+    console.log(
+        `   🔸 Hours: (${totalHours.toFixed(1)} - ${minHours.toFixed(1)}) / (${maxHours.toFixed(1)} - ${minHours.toFixed(1)}) = ${hoursRatio.toFixed(3)} → ${hoursScore.toFixed(1)} (20%)`
+    );
+} else {
+    console.log(`   🔸 Hours: All same (${totalHours.toFixed(1)}) → 50 (20%)`);
+}
+
+const finalScore = (roleScore * 0.5) + (offsetScore * 0.3) + (hoursScore * 0.2);
+
+console.log(`   💯 Priority Score: ${roleScore}*0.5 + ${offsetScore.toFixed(1)}*0.3 + ${hoursScore.toFixed(1)}*0.2 = ${finalScore.toFixed(2)}`);
+
+return finalScore;
+    }
+
+/**
+ * Chuẩn hoá thời gian & chuyển sang phút
+ */
+normalizeTime(timeStr) {
+    if (!timeStr) return null;
+    return timeStr.toString().trim().slice(0, 5); // HH:MM
+}
+
+timeToMinutes(timeStr) {
+    const norm = this.normalizeTime(timeStr);
+    if (!norm || !norm.includes(':')) {
+        console.log('      ⚠️ Invalid time string:', timeStr);
+        return NaN;
+    }
+    const [hours, minutes] = norm.split(':').map(Number);
+    return hours * 60 + minutes;
+}
+
+/**
+ * Kiểm tra thời gian bắt đầu của lớp có nằm trong ca làm việc không
+ */
+isTimeInRange(classStart, classEnd, shiftStart, shiftEnd) {
+    const cs = this.timeToMinutes(classStart);
+    const ss = this.timeToMinutes(shiftStart);
+    const se = this.timeToMinutes(shiftEnd);
+
+    const result = cs >= ss && cs < se;
+    console.log(
+        `      🔍 Time check (minutes): ${cs} >= ${ss} && ${cs} < ${se} = ${result} (${classStart} vs ${shiftStart}-${shiftEnd})`
+    );
+    return result;
+}
+
+/**
+ * Kiểm tra hai khoảng thời gian có chồng lấn không
+ */
+isTimeOverlap(start1, end1, start2, end2) {
+    const s1 = this.timeToMinutes(start1);
+    const e1 = this.timeToMinutes(end1);
+    const s2 = this.timeToMinutes(start2);
+    const e2 = this.timeToMinutes(end2);
+
+    if ([s1, e1, s2, e2].some(v => Number.isNaN(v))) {
         console.log(
-            `      [OverlapCheck] ${start1}-${end1} (${s1}-${e1}) vs ${start2}-${end2} (${s2}-${e2}) → ${overlap}`
+            '      ⚠️ Cannot check overlap, invalid time(s):',
+            start1,
+            end1,
+            start2,
+            end2
         );
-        return overlap;
+        return false;
     }
 
-    /**
-     * Lấy tên thứ trong tuần từ Date
-     */
-    getDayOfWeek(date) {
-        const days = [
-            'Sunday',
-            'Monday',
-            'Tuesday',
-            'Wednesday',
-            'Thursday',
-            'Friday',
-            'Saturday'
-        ];
-        return days[date.getDay()];
-    }
+    const overlap = s1 < e2 && e1 > s2;
+    console.log(
+        `      [OverlapCheck] ${start1}-${end1} (${s1}-${e1}) vs ${start2}-${end2} (${s2}-${e2}) → ${overlap}`
+    );
+    return overlap;
+}
+
+/**
+ * Lấy tên thứ trong tuần từ Date
+ */
+getDayOfWeek(date) {
+    const days = [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday'
+    ];
+    return days[date.getDay()];
+}
 
     /**
      * Thu thập thông tin workload của giáo viên
      */
     async getTeacherWorkload(teacher) {
-        const fixedSchedules = await FixedSchedule.find({
-            teacherId: teacher._id,
-            isActive: true
-        });
+    const fixedSchedules = await FixedSchedule.find({
+        teacherId: teacher._id,
+        isActive: true
+    });
 
-        let totalHoursInMonth = 0;
-        if (fixedSchedules && fixedSchedules.length > 0) {
-            const today = new Date();
-            const monthStart = new Date(
-                Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1, 0, 0, 0, 0)
-            );
-            const monthEnd = new Date(
-                Date.UTC(
-                    today.getUTCFullYear(),
-                    today.getUTCMonth() + 1,
-                    0,
-                    23,
-                    59,
-                    59,
-                    999
-                )
-            );
-
-            console.log(
-                `      [${teacher.name}] Found ${fixedSchedules.length} fixed schedules`
-            );
-            console.log(
-                `      [${teacher.name}] Month range: ${monthStart
-                    .toISOString()
-                    .split('T')[0]} to ${monthEnd.toISOString().split('T')[0]}`
-            );
-
-            for (const schedule of fixedSchedules) {
-                const startMinutes = this.timeToMinutes(schedule.startTime);
-                const endMinutes = this.timeToMinutes(schedule.endTime);
-                let hoursPerSession = (endMinutes - startMinutes) / 60;
-
-                // Apply 0.75 multiplier for Tutors (based on schedule role)
-                if (schedule.role === 'tutor') {
-                    hoursPerSession *= 0.75;
-                }
-
-                let sessionsInMonth = 0;
-                const scheduleDayOfWeek = schedule.dayOfWeek;
-
-                const dayNameToNumber = {
-                    Sunday: 0,
-                    Monday: 1,
-                    Tuesday: 2,
-                    Wednesday: 3,
-                    Thursday: 4,
-                    Friday: 5,
-                    Saturday: 6
-                };
-                const expectedDayNumber = dayNameToNumber[scheduleDayOfWeek];
-
-                if (expectedDayNumber === undefined) {
-                    console.log(
-                        `      ⚠️ Warning: Invalid dayOfWeek "${scheduleDayOfWeek}" for schedule ${schedule._id}`
-                    );
-                    continue;
-                }
-
-                const leaves = await FixedScheduleLeave.find({
-                    teacherId: teacher._id,
-                    fixedScheduleId: schedule._id,
-                    date: {
-                        $gte: monthStart,
-                        $lte: monthEnd
-                    }
-                });
-
-                const leaveDates = new Set();
-                leaves.forEach(leave => {
-                    const leaveDate = new Date(leave.date);
-                    const dateKey = `${leaveDate.getUTCFullYear()}-${String(
-                        leaveDate.getUTCMonth() + 1
-                    ).padStart(2, '0')}-${String(
-                        leaveDate.getUTCDate()
-                    ).padStart(2, '0')}`;
-                    leaveDates.add(dateKey);
-                });
-
-                for (let d = new Date(monthStart); d <= monthEnd; d.setUTCDate(
-                    d.getUTCDate() + 1
-                )) {
-                    const scheduleStart = schedule.startDate
-                        ? new Date(schedule.startDate)
-                        : null;
-                    const scheduleEnd = schedule.endDate
-                        ? new Date(schedule.endDate)
-                        : null;
-
-                    const isInDateRange =
-                        (!scheduleStart || d >= scheduleStart) &&
-                        (!scheduleEnd || d <= scheduleEnd);
-
-                    if (isInDateRange) {
-                        const currentDayOfWeek = d.getUTCDay();
-                        if (currentDayOfWeek === expectedDayNumber) {
-                            const dateKey = `${d.getUTCFullYear()}-${String(
-                                d.getUTCMonth() + 1
-                            ).padStart(2, '0')}-${String(
-                                d.getUTCDate()
-                            ).padStart(2, '0')}`;
-                            if (!leaveDates.has(dateKey)) {
-                                sessionsInMonth++;
-                            }
-                        }
-                    }
-                }
-
-                totalHoursInMonth += hoursPerSession * sessionsInMonth;
-                const scheduleTotalHours = hoursPerSession * sessionsInMonth;
-                console.log(
-                    `      [${teacher.name}] Schedule ${schedule.className} (${scheduleDayOfWeek} ${schedule.startTime}-${schedule.endTime}): ${sessionsInMonth} sessions × ${hoursPerSession.toFixed(
-                        1
-                    )}h = ${scheduleTotalHours.toFixed(1)}h`
-                );
-                if (leaves.length > 0) {
-                    console.log(`        ⚠️ ${leaves.length} leave days excluded`);
-                }
-            }
-
-            console.log(
-                `      [${teacher.name}] Total fixed hours in month: ${totalHoursInMonth.toFixed(
-                    1
-                )}h`
-            );
-        } else {
-            console.log(`      [${teacher.name}] No fixed schedules found`);
-        }
-
+    let totalHoursInMonth = 0;
+    if (fixedSchedules && fixedSchedules.length > 0) {
         const today = new Date();
         const monthStart = new Date(
             Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1, 0, 0, 0, 0)
@@ -747,105 +773,231 @@ class OffsetAllocationService {
             )
         );
 
-        const offsetClasses = await OffsetClass.find({
-            assignedTeacherId: teacher._id,
-            status: { $in: ['pending', 'assigned', 'completed'] },
-            scheduledDate: {
-                $gte: monthStart,
-                $lte: monthEnd
-            }
-        });
-
-        let offsetHoursInMonth = 0;
-        for (const oc of offsetClasses) {
-            const startMinutes = this.timeToMinutes(oc.startTime);
-            const endMinutes = this.timeToMinutes(oc.endTime);
-            const hoursPerClass = (endMinutes - startMinutes) / 60;
-            offsetHoursInMonth += hoursPerClass;
-        }
-
-        const totalHours = totalHoursInMonth + offsetHoursInMonth;
-        const currentOffsetCount = offsetClasses.length;
-
         console.log(
-            `      [${teacher.name}] Fixed: ${totalHoursInMonth.toFixed(
-                1
-            )}h, Offset: ${offsetHoursInMonth.toFixed(
-                1
-            )}h, Total: ${totalHours.toFixed(
-                1
-            )}h, Offset count: ${currentOffsetCount}`
+            `      [${teacher.name}] Found ${fixedSchedules.length} fixed schedules`
+        );
+        console.log(
+            `      [${teacher.name}] Month range: ${monthStart
+                .toISOString()
+                .split('T')[0]} to ${monthEnd.toISOString().split('T')[0]}`
         );
 
-        return {
-            totalHours,
-            offsetCount: currentOffsetCount
-        };
+        for (const schedule of fixedSchedules) {
+            const startMinutes = this.timeToMinutes(schedule.startTime);
+            const endMinutes = this.timeToMinutes(schedule.endTime);
+            let hoursPerSession = (endMinutes - startMinutes) / 60;
+
+            // Apply 0.75 multiplier for Tutors (based on schedule role)
+            if (schedule.role === 'tutor') {
+                hoursPerSession *= 0.75;
+            }
+
+            let sessionsInMonth = 0;
+            const scheduleDayOfWeek = schedule.dayOfWeek;
+
+            const dayNameToNumber = {
+                Sunday: 0,
+                Monday: 1,
+                Tuesday: 2,
+                Wednesday: 3,
+                Thursday: 4,
+                Friday: 5,
+                Saturday: 6
+            };
+            const expectedDayNumber = dayNameToNumber[scheduleDayOfWeek];
+
+            if (expectedDayNumber === undefined) {
+                console.log(
+                    `      ⚠️ Warning: Invalid dayOfWeek "${scheduleDayOfWeek}" for schedule ${schedule._id}`
+                );
+                continue;
+            }
+
+            const leaves = await FixedScheduleLeave.find({
+                teacherId: teacher._id,
+                fixedScheduleId: schedule._id,
+                date: {
+                    $gte: monthStart,
+                    $lte: monthEnd
+                }
+            });
+
+            const leaveDates = new Set();
+            leaves.forEach(leave => {
+                const leaveDate = new Date(leave.date);
+                const dateKey = `${leaveDate.getUTCFullYear()}-${String(
+                    leaveDate.getUTCMonth() + 1
+                ).padStart(2, '0')}-${String(
+                    leaveDate.getUTCDate()
+                ).padStart(2, '0')}`;
+                leaveDates.add(dateKey);
+            });
+
+            for (let d = new Date(monthStart); d <= monthEnd; d.setUTCDate(
+                d.getUTCDate() + 1
+            )) {
+                const scheduleStart = schedule.startDate
+                    ? new Date(schedule.startDate)
+                    : null;
+                const scheduleEnd = schedule.endDate
+                    ? new Date(schedule.endDate)
+                    : null;
+
+                const isInDateRange =
+                    (!scheduleStart || d >= scheduleStart) &&
+                    (!scheduleEnd || d <= scheduleEnd);
+
+                if (isInDateRange) {
+                    const currentDayOfWeek = d.getUTCDay();
+                    if (currentDayOfWeek === expectedDayNumber) {
+                        const dateKey = `${d.getUTCFullYear()}-${String(
+                            d.getUTCMonth() + 1
+                        ).padStart(2, '0')}-${String(
+                            d.getUTCDate()
+                        ).padStart(2, '0')}`;
+                        if (!leaveDates.has(dateKey)) {
+                            sessionsInMonth++;
+                        }
+                    }
+                }
+            }
+
+            totalHoursInMonth += hoursPerSession * sessionsInMonth;
+            const scheduleTotalHours = hoursPerSession * sessionsInMonth;
+            console.log(
+                `      [${teacher.name}] Schedule ${schedule.className} (${scheduleDayOfWeek} ${schedule.startTime}-${schedule.endTime}): ${sessionsInMonth} sessions × ${hoursPerSession.toFixed(
+                    1
+                )}h = ${scheduleTotalHours.toFixed(1)}h`
+            );
+            if (leaves.length > 0) {
+                console.log(`        ⚠️ ${leaves.length} leave days excluded`);
+            }
+        }
+
+        console.log(
+            `      [${teacher.name}] Total fixed hours in month: ${totalHoursInMonth.toFixed(
+                1
+            )}h`
+        );
+    } else {
+        console.log(`      [${teacher.name}] No fixed schedules found`);
     }
+
+    const today = new Date();
+    const monthStart = new Date(
+        Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1, 0, 0, 0, 0)
+    );
+    const monthEnd = new Date(
+        Date.UTC(
+            today.getUTCFullYear(),
+            today.getUTCMonth() + 1,
+            0,
+            23,
+            59,
+            59,
+            999
+        )
+    );
+
+    const offsetClasses = await OffsetClass.find({
+        assignedTeacherId: teacher._id,
+        status: { $in: ['pending', 'assigned', 'completed'] },
+        scheduledDate: {
+            $gte: monthStart,
+            $lte: monthEnd
+        }
+    });
+
+    let offsetHoursInMonth = 0;
+    for (const oc of offsetClasses) {
+        const startMinutes = this.timeToMinutes(oc.startTime);
+        const endMinutes = this.timeToMinutes(oc.endTime);
+        const hoursPerClass = (endMinutes - startMinutes) / 60;
+        offsetHoursInMonth += hoursPerClass;
+    }
+
+    const totalHours = totalHoursInMonth + offsetHoursInMonth;
+    const currentOffsetCount = offsetClasses.length;
+
+    console.log(
+        `      [${teacher.name}] Fixed: ${totalHoursInMonth.toFixed(
+            1
+        )}h, Offset: ${offsetHoursInMonth.toFixed(
+            1
+        )}h, Total: ${totalHours.toFixed(
+            1
+        )}h, Offset count: ${currentOffsetCount}`
+    );
+
+    return {
+        totalHours,
+        offsetCount: currentOffsetCount
+    };
+}
 
     /**
      * Phân bổ nhiều lớp offset cùng lúc
      */
     async allocateMultipleClasses(offsetClasses) {
-        const results = [];
+    const results = [];
 
-        for (const offsetClass of offsetClasses) {
-            try {
-                const teacher = await this.findSuitableTeacher(offsetClass);
+    for (const offsetClass of offsetClasses) {
+        try {
+            const teacher = await this.findSuitableTeacher(offsetClass);
 
-                if (teacher) {
-                    results.push({
-                        offsetClass,
-                        assignedTeacher: teacher,
-                        success: true,
-                        message: 'Teacher assigned successfully'
-                    });
-                } else {
-                    results.push({
-                        offsetClass,
-                        assignedTeacher: null,
-                        success: false,
-                        message: 'No suitable teacher found'
-                    });
-                }
-            } catch (error) {
+            if (teacher) {
+                results.push({
+                    offsetClass,
+                    assignedTeacher: teacher,
+                    success: true,
+                    message: 'Teacher assigned successfully'
+                });
+            } else {
                 results.push({
                     offsetClass,
                     assignedTeacher: null,
                     success: false,
-                    message: error.message
+                    message: 'No suitable teacher found'
                 });
             }
+        } catch (error) {
+            results.push({
+                offsetClass,
+                assignedTeacher: null,
+                success: false,
+                message: error.message
+            });
         }
-
-        return results;
     }
+
+    return results;
+}
 
     /**
      * Tái phân bổ lớp offset khi giáo viên không khả dụng
      */
     async reallocateClass(offsetClassId) {
-        const offsetClass = await OffsetClass.findById(offsetClassId);
+    const offsetClass = await OffsetClass.findById(offsetClassId);
 
-        if (!offsetClass) {
-            throw new Error('Offset class not found');
-        }
-
-        const excludeIds = [];
-        if (offsetClass.assignedTeacherId)
-            excludeIds.push(offsetClass.assignedTeacherId.toString());
-        if (
-            offsetClass.assignedHistory &&
-            Array.isArray(offsetClass.assignedHistory) &&
-            offsetClass.assignedHistory.length
-        ) {
-            offsetClass.assignedHistory.forEach(id => excludeIds.push(id.toString()));
-        }
-
-        const newTeacher = await this.findSuitableTeacher(offsetClass, excludeIds);
-
-        return newTeacher;
+    if (!offsetClass) {
+        throw new Error('Offset class not found');
     }
+
+    const excludeIds = [];
+    if (offsetClass.assignedTeacherId)
+        excludeIds.push(offsetClass.assignedTeacherId.toString());
+    if (
+        offsetClass.assignedHistory &&
+        Array.isArray(offsetClass.assignedHistory) &&
+        offsetClass.assignedHistory.length
+    ) {
+        offsetClass.assignedHistory.forEach(id => excludeIds.push(id.toString()));
+    }
+
+    const newTeacher = await this.findSuitableTeacher(offsetClass, excludeIds);
+
+    return newTeacher;
+}
 }
 
 export default new OffsetAllocationService();

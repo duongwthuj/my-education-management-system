@@ -67,7 +67,8 @@ const ScheduleCalendar = ({
       if (isOnLeave) return false;
 
       const fsStartMinutes = timeToMinutes(fs.startTime);
-      return fsStartMinutes >= shiftStartMinutes && fsStartMinutes < shiftEndMinutes;
+      const fsEndMinutes = timeToMinutes(fs.endTime);
+      return fsStartMinutes < shiftEndMinutes && fsEndMinutes > shiftStartMinutes;
     });
     
     // Get all offset classes for this teacher on this date that start in this shift
@@ -87,7 +88,8 @@ const ScheduleCalendar = ({
 
       if (ocTeacherId === teacherId && formattedOcDate === date) {
         const ocStartMinutes = timeToMinutes(oc.startTime);
-        return ocStartMinutes >= shiftStartMinutes && ocStartMinutes < shiftEndMinutes;
+        const ocEndMinutes = timeToMinutes(oc.endTime);
+        return ocStartMinutes < shiftEndMinutes && ocEndMinutes > shiftStartMinutes;
       }
       return false;
     });
@@ -105,7 +107,8 @@ const ScheduleCalendar = ({
 
       if (subTeacherId === teacherId && formattedLeaveDate === date && leave.fixedScheduleId) {
         const fsStartMinutes = timeToMinutes(leave.fixedScheduleId.startTime);
-        return fsStartMinutes >= shiftStartMinutes && fsStartMinutes < shiftEndMinutes;
+        const fsEndMinutes = timeToMinutes(leave.fixedScheduleId.endTime);
+        return fsStartMinutes < shiftEndMinutes && fsEndMinutes > shiftStartMinutes;
       }
       return false;
     });
@@ -125,7 +128,8 @@ const ScheduleCalendar = ({
 
       if (scTeacherId === teacherId && formattedScDate === date) {
         const scStartMinutes = timeToMinutes(sc.startTime);
-        return scStartMinutes >= shiftStartMinutes && scStartMinutes < shiftEndMinutes;
+        const scEndMinutes = timeToMinutes(sc.endTime);
+        return scStartMinutes < shiftEndMinutes && scEndMinutes > shiftStartMinutes;
       }
       return false;
     });
@@ -144,7 +148,8 @@ const ScheduleCalendar = ({
 
       if (tcTeacherId === teacherId && formattedTcDate === date) {
         const tcStartMinutes = timeToMinutes(tc.startTime);
-        return tcStartMinutes >= shiftStartMinutes && tcStartMinutes < shiftEndMinutes;
+        const tcEndMinutes = timeToMinutes(tc.endTime);
+        return tcStartMinutes < shiftEndMinutes && tcEndMinutes > shiftStartMinutes;
       }
       return false;
     });

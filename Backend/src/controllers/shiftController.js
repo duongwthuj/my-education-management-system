@@ -215,11 +215,11 @@ export const getTeacherAvailability = async (req, res) => {
     }
 };
 
-// CREATE work shift
+// CREATE work shift (auto-overwrite if exists)
 export const createWorkShift = async (req, res) => {
     try {
         const { teacherId, date, shiftId, isAvailable = true, isOnLeave = false, notes } = req.body;
-        
+
         // Validation
         if (!teacherId || !date || !shiftId) {
             return res.status(400).json({
@@ -232,6 +232,10 @@ export const createWorkShift = async (req, res) => {
         const workShiftDate = new Date(date);
         const normalizedDate = new Date(Date.UTC(workShiftDate.getUTCFullYear(), workShiftDate.getUTCMonth(), workShiftDate.getUTCDate(), 0, 0, 0, 0));
 
+        // Delete all exist work shifts for this teacher on this date (replace strategy)
+        await WorkShift.deleteMany({ teacherId, date: normalizedDate });
+
+        // Create new work shift
         const workShift = new WorkShift({
             teacherId,
             date: normalizedDate,
@@ -240,22 +244,15 @@ export const createWorkShift = async (req, res) => {
             isOnLeave,
             notes
         });
-        
+
         await workShift.save();
 
         res.status(201).json({
             success: true,
-            message: 'Work shift created successfully',
+            message: 'Work shift saved successfully (replaced existing)',
             data: workShift
         });
     } catch (error) {
-        if (error.code === 11000) {
-            return res.status(400).json({
-                success: false,
-                message: 'Work shift already exists for this teacher, date and shift'
-            });
-        }
-
         res.status(500).json({
             success: false,
             message: 'Error creating work shift',
@@ -280,7 +277,7 @@ export const createBulkWorkShifts = async (req, res) => {
             // Chuẩn hóa ngày về UTC cho từng shift
             const shiftDate = new Date(shift.date);
             const normalizedDate = new Date(Date.UTC(shiftDate.getUTCFullYear(), shiftDate.getUTCMonth(), shiftDate.getUTCDate(), 0, 0, 0, 0));
-            
+
             return {
                 teacherId,
                 ...shift,

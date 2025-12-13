@@ -213,7 +213,7 @@ const Schedule = () => {
         subjectsRes
       ] = await Promise.all([
         scheduleAPI.getAllShifts(),
-        teachersAPI.getAll({ limit: 1000 }),
+        teachersAPI.getAll({ limit: 1000, status: 'active' }),
         scheduleAPI.getWorkShifts(),
         fixedScheduleLeaveAPI.getAll(),
         offsetClassesAPI.getAll({ limit: 1000 }),
@@ -389,7 +389,8 @@ const Schedule = () => {
       loadData();
     } catch (error) {
       console.error('Error creating work shifts:', error);
-      showNotification('Lỗi khi thêm lịch làm việc', 'error');
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Lỗi không xác định';
+      showNotification(`Lỗi khi thêm lịch làm việc: ${errorMessage}`, 'error');
     }
   };
 
@@ -428,7 +429,8 @@ const Schedule = () => {
       loadData();
     } catch (error) {
       console.error('Error handling leave:', error);
-      showNotification('Có lỗi xảy ra', 'error');
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Lỗi không xác định';
+      showNotification(`Có lỗi xảy ra: ${errorMessage}`, 'error');
     }
   };
 
@@ -457,7 +459,8 @@ const Schedule = () => {
       loadData();
     } catch (error) {
       console.error('Error creating offset class:', error);
-      showNotification('Lỗi khi tạo lớp offset', 'error');
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Lỗi không xác định';
+      showNotification(`Lỗi khi tạo lớp offset: ${errorMessage}`, 'error');
     }
   };
 
@@ -486,7 +489,8 @@ const Schedule = () => {
       loadData();
     } catch (error) {
       console.error('Error creating supplementary class:', error);
-      showNotification('Lỗi khi tạo lớp bổ trợ', 'error');
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Lỗi không xác định';
+      showNotification(`Lỗi khi tạo lớp bổ trợ: ${errorMessage}`, 'error');
     }
   };
 
@@ -530,7 +534,8 @@ const Schedule = () => {
       loadData();
     } catch (error) {
       console.error('Error creating test class:', error);
-      showNotification('Lỗi khi tạo lớp test', 'error');
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Lỗi không xác định';
+      showNotification(`Lỗi khi tạo lớp test: ${errorMessage}`, 'error');
     }
   };
 
@@ -550,7 +555,8 @@ const Schedule = () => {
       loadData();
     } catch (error) {
       console.error('Error creating fixed schedule:', error);
-      showNotification('Lỗi khi thêm lịch cố định', 'error');
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Lỗi không xác định';
+      showNotification(`Lỗi khi thêm lịch cố định: ${errorMessage}`, 'error');
     }
   };
 
