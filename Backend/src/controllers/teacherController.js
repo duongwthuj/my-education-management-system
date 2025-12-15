@@ -207,9 +207,32 @@ export const deleteTeacher = async (req, res) => {
     }
 };
 
+// Helper to check ownership
+const checkOwnership = async (req, teacherId) => {
+    // If not admin, check if the target teacherId matches the user's teacherId
+    if (req.user.role !== 'admin') {
+        // req.user.teacherId is populated in authMiddleware (need to ensure this)
+        // or we fetch user again. 
+        // For efficiency, let's assume req.user has teacherId if we updated protect middleware
+        // But protect middleware currently attaches user document.
+        // User model has teacherId.
+
+        if (!req.user.teacherId || req.user.teacherId.toString() !== teacherId) {
+            throw new Error('Unauthorized: You can only modify your own data');
+        }
+    }
+};
+
+// ... (previous code)
+
+// UPDATE teacher
+// ...
+
 // ADD subject level to teacher
 export const addTeacherLevel = async (req, res) => {
     try {
+        await checkOwnership(req, req.params.id);
+
         const { subjectLevelId, experienceYears, certifications } = req.body;
 
         const teacherLevel = new TeacherLevel({
@@ -227,6 +250,9 @@ export const addTeacherLevel = async (req, res) => {
             data: teacherLevel
         });
     } catch (error) {
+        if (error.message.includes('Unauthorized')) {
+            return res.status(403).json({ success: false, message: error.message });
+        }
         if (error.code === 11000) {
             return res.status(400).json({
                 success: false,
@@ -245,12 +271,8 @@ export const addTeacherLevel = async (req, res) => {
 // UPDATE teacher level
 export const updateTeacherLevel = async (req, res) => {
     try {
-        const teacherLevel = await TeacherLevel.findByIdAndUpdate(
-            req.params.levelId,
-            req.body,
-            { new: true, runValidators: true }
-        );
-
+        // First find the level to get the teacherId
+        const teacherLevel = await TeacherLevel.findById(req.params.levelId);
         if (!teacherLevel) {
             return res.status(404).json({
                 success: false,
@@ -258,12 +280,23 @@ export const updateTeacherLevel = async (req, res) => {
             });
         }
 
+        await checkOwnership(req, teacherLevel.teacherId.toString());
+
+        const updatedLevel = await TeacherLevel.findByIdAndUpdate(
+            req.params.levelId,
+            req.body,
+            { new: true, runValidators: true }
+        );
+
         res.status(200).json({
             success: true,
             message: 'Teacher level updated successfully',
-            data: teacherLevel
+            data: updatedLevel
         });
     } catch (error) {
+        if (error.message.includes('Unauthorized')) {
+            return res.status(403).json({ success: false, message: error.message });
+        }
         res.status(500).json({
             success: false,
             message: 'Error updating teacher level',
@@ -275,8 +308,7 @@ export const updateTeacherLevel = async (req, res) => {
 // DELETE teacher level
 export const deleteTeacherLevel = async (req, res) => {
     try {
-        const teacherLevel = await TeacherLevel.findByIdAndDelete(req.params.levelId);
-
+        const teacherLevel = await TeacherLevel.findById(req.params.levelId);
         if (!teacherLevel) {
             return res.status(404).json({
                 success: false,
@@ -284,11 +316,18 @@ export const deleteTeacherLevel = async (req, res) => {
             });
         }
 
+        await checkOwnership(req, teacherLevel.teacherId.toString());
+
+        await TeacherLevel.findByIdAndDelete(req.params.levelId);
+
         res.status(200).json({
             success: true,
             message: 'Teacher level deleted successfully'
         });
     } catch (error) {
+        if (error.message.includes('Unauthorized')) {
+            return res.status(403).json({ success: false, message: error.message });
+        }
         res.status(500).json({
             success: false,
             message: 'Error deleting teacher level',
@@ -300,6 +339,8 @@ export const deleteTeacherLevel = async (req, res) => {
 // ADD fixed schedule to teacher
 export const addFixedSchedule = async (req, res) => {
     try {
+        await checkOwnership(req, req.params.id);
+
         const fixedSchedule = new FixedSchedule({
             ...req.body,
             teacherId: req.params.id
@@ -313,6 +354,9 @@ export const addFixedSchedule = async (req, res) => {
             data: fixedSchedule
         });
     } catch (error) {
+        if (error.message.includes('Unauthorized')) {
+            return res.status(403).json({ success: false, message: error.message });
+        }
         res.status(500).json({
             success: false,
             message: 'Error adding fixed schedule',
@@ -324,12 +368,7 @@ export const addFixedSchedule = async (req, res) => {
 // UPDATE fixed schedule
 export const updateFixedSchedule = async (req, res) => {
     try {
-        const fixedSchedule = await FixedSchedule.findByIdAndUpdate(
-            req.params.scheduleId,
-            req.body,
-            { new: true, runValidators: true }
-        );
-
+        const fixedSchedule = await FixedSchedule.findById(req.params.scheduleId);
         if (!fixedSchedule) {
             return res.status(404).json({
                 success: false,
@@ -337,12 +376,23 @@ export const updateFixedSchedule = async (req, res) => {
             });
         }
 
+        await checkOwnership(req, fixedSchedule.teacherId.toString());
+
+        const updatedSchedule = await FixedSchedule.findByIdAndUpdate(
+            req.params.scheduleId,
+            req.body,
+            { new: true, runValidators: true }
+        );
+
         res.status(200).json({
             success: true,
             message: 'Fixed schedule updated successfully',
-            data: fixedSchedule
+            data: updatedSchedule
         });
     } catch (error) {
+        if (error.message.includes('Unauthorized')) {
+            return res.status(403).json({ success: false, message: error.message });
+        }
         res.status(500).json({
             success: false,
             message: 'Error updating fixed schedule',
@@ -354,8 +404,7 @@ export const updateFixedSchedule = async (req, res) => {
 // DELETE fixed schedule
 export const deleteFixedSchedule = async (req, res) => {
     try {
-        const fixedSchedule = await FixedSchedule.findByIdAndDelete(req.params.scheduleId);
-
+        const fixedSchedule = await FixedSchedule.findById(req.params.scheduleId);
         if (!fixedSchedule) {
             return res.status(404).json({
                 success: false,
@@ -363,11 +412,18 @@ export const deleteFixedSchedule = async (req, res) => {
             });
         }
 
+        await checkOwnership(req, fixedSchedule.teacherId.toString());
+
+        await FixedSchedule.findByIdAndDelete(req.params.scheduleId);
+
         res.status(200).json({
             success: true,
             message: 'Fixed schedule deleted successfully'
         });
     } catch (error) {
+        if (error.message.includes('Unauthorized')) {
+            return res.status(403).json({ success: false, message: error.message });
+        }
         res.status(500).json({
             success: false,
             message: 'Error deleting fixed schedule',

@@ -1,0 +1,180 @@
+﻿> Task :gradle:checkKotlinGradlePluginConfigurationErrors
+> Task :gradle:compileKotlin UP-TO-DATE
+> Task :gradle:compileJava NO-SOURCE
+> Task :gradle:compileGroovy UP-TO-DATE
+> Task :gradle:pluginDescriptors UP-TO-DATE
+> Task :gradle:processResources UP-TO-DATE
+> Task :gradle:classes UP-TO-DATE
+> Task :gradle:jar UP-TO-DATE
+
+> Configure project :shared_preferences_android
+.\gradlew.bat : Your project is configured 
+with Android NDK 26.3.11579264, but the 
+following plugin(s) depend on a different 
+Android NDK version:
+At line:1 char:1
++ .\gradlew.bat clean assembleDebug > 
+build_log.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified 
+   : (Your project is...id NDK version::S  
+  tring) [], RemoteException
+    + FullyQualifiedErrorId : NativeComman 
+   dError
+ 
+- flutter_secure_storage requires Android 
+NDK 27.0.12077973
+- path_provider_android requires Android 
+NDK 27.0.12077973
+- shared_preferences_android requires 
+Android NDK 27.0.12077973
+Fix this issue by using the highest 
+Android NDK version (they are backward 
+compatible).
+Add the following to 
+C:\Users\ADMIN\Desktop\LMS connect\Mobile\m
+obile_app\android\app\build.gradle.kts:
+
+    android {
+        ndkVersion = "27.0.12077973"
+        ...
+    }
+
+
+> Task :clean
+> Task :app:externalNativeBuildCleanDebug
+> Task :app:externalNativeBuildCleanProfile
+> Task :app:externalNativeBuildCleanRelease
+> Task :app:clean UP-TO-DATE
+> Task :flutter_secure_storage:clean UP-TO-DATE
+> Task :path_provider_android:clean UP-TO-DATE
+> Task :shared_preferences_android:clean UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+
+> Task :app:compileFlutterBuildDebug
+lib/features/auth/domain/repositories/auth_
+repository.dart:3:8: Error: Error when 
+reading 'lib/features/auth/domain/repositor
+ies/user.dart': The system cannot find the 
+file specified.
+
+import 'user.dart';
+       ^
+lib/features/auth/data/models/user_model.da
+rt:1:8: Error: Error when reading 'lib/feat
+ures/auth/data/domain/entities/user.dart': 
+The system cannot find the path specified.
+
+import '../domain/entities/user.dart';
+       ^
+lib/features/auth/domain/repositories/auth_
+repository.dart:6:26: Error: Type 'User' 
+not found.
+  Future<Either<Failure, User>> 
+login(String username, String password);
+                         ^^^^
+lib/features/auth/data/models/user_model.da
+rt:3:25: Error: Type 'User' not found.
+class UserModel extends User {
+                        ^^^^
+lib/features/auth/data/models/user_model.da
+rt:9:14: Error: No named parameter with 
+the name 'id'.
+  }) : super(id: id, username: username, 
+role: role, token: token);
+             ^^
+lib/features/auth/data/repositories/auth_re
+pository_impl.dart:20:20: Error: The 
+argument type 'UserModel' can't be 
+assigned to the parameter type 'User'.
+ - 'UserModel' is from 'package:mobile_app/
+features/auth/data/models/user_model.dart' 
+('lib/features/auth/data/models/user_model.
+dart').
+ - 'User' is from 'package:mobile_app/featu
+res/auth/domain/entities/user.dart' ('lib/f
+eatures/auth/domain/entities/user.dart').
+      return Right(userModel);
+                   ^
+lib/features/auth/data/models/user_model.da
+rt:22:13: Error: The getter 'id' isn't 
+defined for the class 'UserModel'.
+ - 'UserModel' is from 'package:mobile_app/
+features/auth/data/models/user_model.dart' 
+('lib/features/auth/data/models/user_model.
+dart').
+Try correcting the name to the name of an 
+existing getter, or defining a getter or 
+field named 'id'.
+      'id': id,
+            ^^
+lib/features/auth/data/models/user_model.da
+rt:23:19: Error: The getter 'username' 
+isn't defined for the class 'UserModel'.
+ - 'UserModel' is from 'package:mobile_app/
+features/auth/data/models/user_model.dart' 
+('lib/features/auth/data/models/user_model.
+dart').
+Try correcting the name to the name of an 
+existing getter, or defining a getter or 
+field named 'username'.
+      'username': username,
+                  ^^^^^^^^
+lib/features/auth/data/models/user_model.da
+rt:24:15: Error: The getter 'role' isn't 
+defined for the class 'UserModel'.
+ - 'UserModel' is from 'package:mobile_app/
+features/auth/data/models/user_model.dart' 
+('lib/features/auth/data/models/user_model.
+dart').
+Try correcting the name to the name of an 
+existing getter, or defining a getter or 
+field named 'role'.
+      'role': role,
+              ^^^^
+lib/features/auth/data/models/user_model.da
+rt:25:16: Error: The getter 'token' isn't 
+defined for the class 'UserModel'.
+ - 'UserModel' is from 'package:mobile_app/
+features/auth/data/models/user_model.dart' 
+('lib/features/auth/data/models/user_model.
+dart').
+Try correcting the name to the name of an 
+existing getter, or defining a getter or 
+field named 'token'.
+      'token': token,
+               ^^^^^
+Target kernel_snapshot_program failed: 
+Exception
+
+
+> Task :app:compileFlutterBuildDebug FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task 
+':app:compileFlutterBuildDebug'.
+> Process 'command 
+'C:\flutter\bin\flutter.bat'' finished 
+with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the 
+stack trace.
+> Run with --info or --debug option to get 
+more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.10.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 4s
+15 actionable tasks: 6 executed, 9 up-to-date

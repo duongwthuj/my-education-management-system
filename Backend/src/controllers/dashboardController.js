@@ -553,3 +553,245 @@ export const getTestClassStatistics = async (req, res) => {
     });
   }
 };
+// Get personal dashboard statistics
+export const getPersonalStats = async (req, res) => {
+  try {
+    const teacherId = req.user.teacherId;
+    if (!teacherId) {
+      return res.status(400).json({ success: false, message: 'User is not linked to a teacher profile' });
+    }
+
+    const today = new Date();
+    const startOfMonthDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonthDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    // 1. Calculate Monthly Teaching Hours
+    // Reuse logic from getTeacherHoursDetail roughly, or simplifed
+    // For dashboard, we need a quick summary. 
+    // Let's rely on calling the internal logic or replicating simplified version.
+    // Replicating simplified version for speed and specific dashboard needs.
+
+    // Fixed Schedules
+    const fixedSchedules = await FixedSchedule.find({ teacherId, isActive: true }).lean();
+    let fixedHours = 0;
+
+    // We need to calculate instances for this month
+    for (const schedule of fixedSchedules) {
+      let hoursPerClass = calculateHours(schedule.startTime, schedule.endTime);
+      if (schedule.role === 'tutor') hoursPerClass *= 0.75;
+
+      // Intersection with month
+      const scheduleStart = schedule.startDate ? new Date(schedule.startDate) : startOfMonthDate;
+      const scheduleEnd = schedule.endDate ? new Date(schedule.endDate) : endOfMonthDate;
+
+      const effectiveStart = scheduleStart > startOfMonthDate ? scheduleStart : startOfMonthDate;
+      const effectiveEnd = scheduleEnd < endOfMonthDate ? scheduleEnd : endOfMonthDate;
+
+      if (effectiveStart <= effectiveEnd) {
+        const totalOccurrences = countDaysOfWeekInRange(effectiveStart, effectiveEnd, schedule.dayOfWeek);
+        // We ideally should subtract leaves, but for a quick dashboard stat, maybe approximation is okay?
+        // Or better, do it right.
+        const leaveOccurrences = await countLeaveDaysInRange(teacherId, effectiveStart, effectiveEnd, schedule.dayOfWeek, schedule._id);
+        fixedHours += hoursPerClass * (totalOccurrences - leaveOccurrences);
+      }
+    }
+
+    // Offset Classes (Month)
+    const offsetClasses = await OffsetClass.find({
+      assignedTeacherId: teacherId,
+      scheduledDate: { $gte: startOfMonthDate, $lte: endOfMonthDate },
+      status: { $in: ['assigned', 'completed'] }
+    }).lean();
+    const offsetHours = offsetClasses.reduce((sum, cls) => sum + calculateHours(cls.startTime, cls.endTime), 0);
+
+    // Substitute (Month)
+    const FixedScheduleLeave = (await import('../models/fixedScheduleLeave.js')).default;
+    const substituteLeaves = await FixedScheduleLeave.find({
+      substituteTeacherId: teacherId,
+      date: { $gte: startOfMonthDate, $lte: endOfMonthDate }
+    }).populate('fixedScheduleId').lean();
+
+    let substituteHours = 0;
+    substituteLeaves.forEach(l => {
+      if (l.fixedScheduleId) {
+        let h = calculateHours(l.fixedScheduleId.startTime, l.fixedScheduleId.endTime);
+        if (l.fixedScheduleId.role === 'tutor') h *= 0.75;
+        substituteHours += h;
+      }
+    });
+
+    const totalHoursMonth = Math.round((fixedHours + offsetHours + substituteHours) * 10) / 10;
+
+    // Test Classes (Month) - Calculate hours
+    const testClasses = await TestClass.find({
+      assignedTeacherId: teacherId,
+      scheduledDate: { $gte: startOfMonthDate, $lte: endOfMonthDate },
+      status: { $in: ['assigned', 'completed'] }
+    }).lean();
+
+    const testHours = testClasses.reduce((sum, cls) => {
+      // Assuming TestClass has startTime and endTime like OffsetClass
+      if (cls.startTime && cls.endTime) {
+        return sum + calculateHours(cls.startTime, cls.endTime);
+      }
+      return sum;
+    }, 0);
+
+    // Supplementary Classes (Month) - Count only
+    const supplementaryCount = await SupplementaryClass.countDocuments({
+      assignedTeacherId: teacherId,
+      scheduledDate: { $gte: startOfMonthDate, $lte: endOfMonthDate },
+      status: 'completed'
+    });
+
+    // 2. Weekly Schedule (Today + 6 days) - Full Agenda
+
+
+    const scheduleStart = new Date(today);
+    scheduleStart.setHours(0, 0, 0, 0);
+
+    const scheduleEnd = new Date(today);
+    scheduleEnd.setDate(today.getDate() + 7);
+    scheduleEnd.setHours(23, 59, 59, 999);
+
+    const scheduleDates = [];
+    for (let d = new Date(scheduleStart); d <= scheduleEnd; d.setDate(d.getDate() + 1)) {
+      scheduleDates.push(new Date(d));
+    }
+
+    // A. Fixed Schedules Expansion
+    const weeklyFixedSchedules = [];
+    const fixedSchedulesForWeek = await FixedSchedule.find({
+      teacherId,
+      isActive: true,
+      startDate: { $lte: scheduleEnd },
+      $or: [{ endDate: null }, { endDate: { $gte: scheduleStart } }]
+    }).populate('subjectId', 'name').lean();
+
+
+    const leaves = await FixedScheduleLeave.find({
+      teacherId,
+      date: { $gte: scheduleStart, $lte: scheduleEnd }
+    }).lean();
+
+    for (const date of scheduleDates) {
+      const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][date.getDay()];
+
+      for (const schedule of fixedSchedulesForWeek) {
+        if (schedule.dayOfWeek === dayName) {
+          // Check date range validity for this specific schedule
+          const sStart = new Date(schedule.startDate);
+          const sEnd = schedule.endDate ? new Date(schedule.endDate) : new Date(9999, 11, 31);
+
+          if (date >= sStart && date <= sEnd) {
+            // Check for leave
+            const isLeave = leaves.some(l =>
+              l.fixedScheduleId &&
+              l.fixedScheduleId.toString() === schedule._id.toString() &&
+              new Date(l.date).toDateString() === date.toDateString()
+            );
+
+            if (!isLeave) {
+              weeklyFixedSchedules.push({
+                type: 'Fixed',
+                className: schedule.className,
+                subject: schedule.subjectId?.name || 'N/A',
+                date: new Date(date), // clone
+                time: `${schedule.startTime} - ${schedule.endTime}`,
+                startTime: schedule.startTime, // for sorting
+                endTime: schedule.endTime
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // B. Other Classes (Offset, Test, Supplementary)
+    // Fetch Assigned OR Completed to show schedule (user might want to see history of week too, or just upcoming? User said "upcoming schedule")
+    // "Lịch dạy sắp tới" implies future. But "Weekly Schedule" usually means the whole week view.
+    // Let's stick to the requested 7-day window from TODAY.
+
+    const weeklyOffset = await OffsetClass.find({
+      assignedTeacherId: teacherId,
+      scheduledDate: { $gte: scheduleStart, $lte: scheduleEnd },
+      status: { $in: ['assigned', 'completed'] }
+    }).populate({ path: 'subjectLevelId', populate: { path: 'subjectId', select: 'name' } }).lean();
+
+    const weeklyTest = await TestClass.find({
+      assignedTeacherId: teacherId,
+      scheduledDate: { $gte: scheduleStart, $lte: scheduleEnd },
+      status: { $in: ['assigned', 'completed'] }
+    }).lean();
+
+    const weeklySupplementary = await SupplementaryClass.find({
+      assignedTeacherId: teacherId,
+      scheduledDate: { $gte: scheduleStart, $lte: scheduleEnd },
+      status: { $in: ['assigned', 'completed'] }
+    }).lean();
+
+    // C. Merge and Sort
+    const upcomingClasses = [
+      ...weeklyFixedSchedules,
+      ...weeklyOffset.map(c => ({
+        type: 'Offset',
+        className: c.className,
+        subject: c.subjectLevelId?.subjectId?.name || 'N/A',
+        date: c.scheduledDate,
+        time: `${c.startTime} - ${c.endTime}`,
+        startTime: c.startTime
+      })),
+      ...weeklyTest.map(c => ({
+        type: 'Test',
+        className: c.className,
+        subject: c.subjectId?.name || 'Test Class', // subjectId might be ObjectId or populated? TestClass usually has subjectId
+        date: c.scheduledDate,
+        time: `${c.startTime} - ${c.endTime}`,
+        startTime: c.startTime
+      })),
+      ...weeklySupplementary.map(c => ({
+        type: 'Supplementary',
+        className: c.className,
+        subject: 'Bổ trợ',
+        date: c.scheduledDate,
+        time: `${c.startTime} - ${c.endTime}`,
+        startTime: c.startTime
+      }))
+    ];
+
+    // Sort by Date then Time
+    upcomingClasses.sort((a, b) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      if (dateA.toDateString() !== dateB.toDateString()) {
+        return dateA - dateB;
+      }
+      return a.startTime.localeCompare(b.startTime);
+    });
+
+    // 3. Pending Requests count
+    const pendingOffsetCount = await OffsetClass.countDocuments({
+      assignedTeacherId: teacherId,
+      status: 'pending'
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        stats: {
+          hoursMonth: totalHoursMonth,
+          testHours: Math.round(testHours * 10) / 10,
+          supplementaryCount: supplementaryCount,
+          upcomingCount: upcomingClasses.length,
+          pendingRequests: pendingOffsetCount
+        },
+        upcomingClasses: upcomingClasses // Now contains full schedule
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching personal stats', error: error.message });
+  }
+};

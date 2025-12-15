@@ -8,7 +8,11 @@ import {
     clearReadNotifications
 } from '../controllers/notificationController.js';
 
+import { protect } from '../middlewares/authMiddleware.js';
+
 const router = express.Router();
+
+router.use(protect);
 
 // GET /api/notifications - Lấy tất cả notifications
 router.get('/', getNotifications);

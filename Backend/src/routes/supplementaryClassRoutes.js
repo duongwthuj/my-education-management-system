@@ -1,4 +1,5 @@
 import express from 'express';
+import { protect, authorize } from '../middlewares/authMiddleware.js';
 import {
     getAllSupplementaryClasses,
     getSupplementaryClassById,
@@ -14,20 +15,25 @@ import {
 
 const router = express.Router();
 
+router.use(protect);
+
 // SupplementaryClass CRUD
-router.get('/', getAllSupplementaryClasses);
-router.get('/:id', getSupplementaryClassById);
-router.post('/', createSupplementaryClass);
-router.post('/with-assignment', createSupplementaryClassWithAssignment);
-router.put('/:id', updateSupplementaryClass);
-router.delete('/:id', deleteSupplementaryClass);
+// Read: All, Write: Admin
+router.get('/', authorize('admin', 'st', 'user'), getAllSupplementaryClasses);
+router.get('/:id', authorize('admin', 'st', 'user'), getSupplementaryClassById);
+
+// Write operations (Admin only)
+router.post('/', authorize('admin'), createSupplementaryClass);
+router.post('/with-assignment', authorize('admin'), createSupplementaryClassWithAssignment);
+router.put('/:id', authorize('admin'), updateSupplementaryClass);
+router.delete('/:id', authorize('admin'), deleteSupplementaryClass);
 
 // Auto-assignment and reallocation
-router.post('/:id/auto-assign', autoAssignTeacher);
-router.post('/:id/reallocate', reallocateTeacher);
+router.post('/:id/auto-assign', authorize('admin'), autoAssignTeacher);
+router.post('/:id/reallocate', authorize('admin'), reallocateTeacher);
 
 // Status management
-router.patch('/:id/complete', markAsCompleted);
-router.patch('/:id/cancel', cancelSupplementaryClass);
+router.patch('/:id/complete', authorize('admin'), markAsCompleted);
+router.patch('/:id/cancel', authorize('admin'), cancelSupplementaryClass);
 
 export default router;

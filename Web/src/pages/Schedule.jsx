@@ -77,7 +77,12 @@ const getDefaultViewRange = () => {
   };
 };
 
+import { useAuth } from '../context/AuthContext';
+
 const Schedule = () => {
+  const { user, hasRole } = useAuth();
+  const canEdit = hasRole('admin');
+
   const { showNotification } = useNotification();
   const [loading, setLoading] = useState(true);
   const [shifts, setShifts] = useState([]);
@@ -740,6 +745,7 @@ const Schedule = () => {
 
   // Interaction handlers
   const handleSlotClick = (teacherId, teacherName, date, shift) => {
+    if (!canEdit) return; // Restrict creation
     setQuickCreateData({
       teacherId,
       teacherName,
@@ -750,6 +756,7 @@ const Schedule = () => {
   };
 
   const handleScheduleClick = (teacherId, date, shift, fixedSchedule, isOnLeave) => {
+    if (!canEdit) return; // Restrict editing
     setSelectedSchedule({
       teacherId,
       date,
@@ -950,13 +957,24 @@ const Schedule = () => {
           <h1 className="text-3xl font-bold text-secondary-900">Quản lý Lịch làm việc</h1>
           <p className="text-secondary-500 mt-1">Quản lý lịch dạy, lịch cố định và phân công giáo viên</p>
         </div>
-        <Button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Thêm lịch làm việc
-        </Button>
+        <div className="flex items-center gap-3">
+          {canEdit && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setShowLeaveModal(true)}
+              >
+                Xin nghỉ phép
+              </Button>
+              <Button
+                onClick={() => setShowModal(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Thêm lịch làm việc
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <ScheduleFilters

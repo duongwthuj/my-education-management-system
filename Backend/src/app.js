@@ -3,6 +3,7 @@ import cors from 'cors';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 
 // Import models để đảm bảo schemas được register
+import './models/user.js';
 import './models/teacher.js';
 import './models/shift.js';
 import './models/workShift.js';
@@ -17,6 +18,7 @@ import './models/supplementaryClass.js';
 import './models/testClass.js';
 
 // Import routes
+import authRoutes from './routes/authRoutes.js';
 import healthRoutes from './routes/health.js';
 import teacherRoutes from './routes/teacherRoutes.js';
 import subjectRoutes from './routes/subjectRoutes.js';
@@ -45,6 +47,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/teachers', teacherRoutes);
 app.use('/api/subjects', subjectRoutes);

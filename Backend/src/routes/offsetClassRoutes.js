@@ -1,4 +1,5 @@
 import express from 'express';
+import { protect, authorize } from '../middlewares/authMiddleware.js';
 import {
     getAllOffsetClasses,
     getOffsetClassById,
@@ -17,25 +18,30 @@ import {
 
 const router = express.Router();
 
+router.use(protect);
+
 // OffsetClass CRUD
-router.get('/', getAllOffsetClasses);
-router.get('/:id', getOffsetClassById);
-router.post('/', createOffsetClass);
-router.post('/with-assignment', createOffsetClassWithAssignment);
-router.post('/bulk', createBulkOffsetClasses);
-router.put('/:id', updateOffsetClass);
-router.delete('/:id', deleteOffsetClass);
+// Read: All, Write: Admin
+router.get('/', authorize('admin', 'st', 'user'), getAllOffsetClasses);
+router.get('/:id', authorize('admin', 'st', 'user'), getOffsetClassById);
 
-// Auto-assignment and reallocation
-router.post('/:id/auto-assign', autoAssignTeacher);
-router.post('/:id/reallocate', reallocateTeacher);
+// Write operations (Admin only)
+router.post('/', authorize('admin'), createOffsetClass);
+router.post('/with-assignment', authorize('admin'), createOffsetClassWithAssignment);
+router.post('/bulk', authorize('admin'), createBulkOffsetClasses);
+router.put('/:id', authorize('admin'), updateOffsetClass);
+router.delete('/:id', authorize('admin'), deleteOffsetClass);
 
-// Status management
-router.patch('/:id/complete', markAsCompleted);
-router.patch('/:id/cancel', cancelOffsetClass);
+// Auto-assignment and reallocation (Admin only)
+router.post('/:id/auto-assign', authorize('admin'), autoAssignTeacher);
+router.post('/:id/reallocate', authorize('admin'), reallocateTeacher);
 
-// Google Sheets integration
-router.post('/sync-from-sheets', syncFromGoogleSheets);
-router.get('/preview-sheets', previewGoogleSheets);
+// Status management (Admin only)
+router.patch('/:id/complete', authorize('admin'), markAsCompleted);
+router.patch('/:id/cancel', authorize('admin'), cancelOffsetClass);
+
+// Google Sheets integration (Admin only)
+router.post('/sync-from-sheets', authorize('admin'), syncFromGoogleSheets);
+router.get('/preview-sheets', authorize('admin'), previewGoogleSheets);
 
 export default router;

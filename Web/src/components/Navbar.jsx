@@ -32,17 +32,7 @@ const Navbar = ({ onMenuClick }) => {
             {/* Notification Bell Component */}
             <NotificationBell />
 
-            <div className="h-8 w-px bg-secondary-200 mx-2 hidden sm:block"></div>
 
-            <div className="flex items-center">
-              <div className="text-right mr-3 hidden sm:block">
-                <p className="text-sm font-semibold text-secondary-900">Admin User</p>
-                <p className="text-xs text-secondary-500">Super Admin</p>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white shadow-md shadow-primary-500/20 ring-2 ring-white cursor-pointer hover:ring-primary-100 transition-all">
-                <span className="font-bold text-sm">A</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
